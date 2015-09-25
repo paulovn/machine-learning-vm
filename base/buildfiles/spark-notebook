@@ -178,6 +178,7 @@ service() {
       test -f "${CFGNAME}-$2" || { echo "can't find Spark config ${CFGNAME}-$2"; exit 1; }
       stop
       echo "$2" > ${CFGNAME}
+      log_success_msg "Configuring Spark for mode: $2 "
       start
       ;;
     config-yarn)
