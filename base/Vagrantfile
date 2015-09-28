@@ -87,7 +87,7 @@ Vagrant.configure(2) do |config|
     #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
     # end
     # Push to artifactory
-    #curl -i -u<USERNAME>:<API_KEY> -T <PATH_TO_FILE> "http://artifactory.hi.inet/artifactory/vagrant-machinelearning/{vagrantBoxName.box};box_name={name};box_provider={provider};box_version={version}"
+    #curl -i -u<USERNAME>:<API_KEY> -T <PATH_TO_FILE> "http://artifactory.hi.inet:8081/artifactory/vagrant-machinelearning/{vagrantBoxName.box};box_name={name};box_provider={provider};box_version={version}"
 
     vgrspark.vm.post_up_message = "**** The Vagrant Spark base machine is up"
 
