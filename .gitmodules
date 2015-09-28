@@ -1,0 +1,3 @@
+[submodule "notebook"]
+	path = notebook
+	url = https://paulovn@github.com/paulovn/ml-vm-notebook
