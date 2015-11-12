@@ -25,7 +25,7 @@ spark_basedir = '/opt/spark'
 # The "2" in Vagrant.configure configures the configuration version
 Vagrant.configure(2) do |config|
 
-  config.vm.define "vgr-tid-spark-base" do |vgrspark|
+  config.vm.define "vgr-tid-spark-base64" do |vgrspark|
     
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
@@ -51,7 +51,7 @@ Vagrant.configure(2) do |config|
     #auto_mount: false
   
     # Customize the virtual machine: hostname & RAM
-    vgrspark.vm.hostname = "vgr-tid-spark-base"
+    vgrspark.vm.hostname = "vgr-tid-spark-base64"
     vgrspark.vm.provider :virtualbox do |vb|
       # Set the hostname in the provider
       vb.name = vgrspark.vm.hostname.to_s
@@ -114,6 +114,10 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
      yum -y install epel-release
      yum -y install R
+     yum -y install libcurl-devel libxml2-devel czmq-devel
+     mkdir -p /usr/local/lib/R/library
+     Rscript -e 'install.packages(c("rmarkdown","magrittr","dplyr","tidyr","data.table","ggplot2"),dependencies=TRUE,repos="http://cran.es.r-project.org/")'
+     Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://cran.es.r-project.org/"))'
     SHELL
 
     # .........................................
@@ -149,6 +153,7 @@ Vagrant.configure(2) do |config|
      sudo rm -rf /opt/ipnb
      sudo mkdir -m 1777 /opt/ipnb
 
+     # Create a virtualenv
      scl enable python27 'virtualenv /opt/ipnb --system-site-packages'
 
      # Create a wrapper to execute virtualenv scripts
@@ -215,11 +220,7 @@ Vagrant.configure(2) do |config|
 
       # Create the directory to place Hadoop config
       mkdir "$3/$2/conf/hadoop"
-
-     #cat <<-'END' > /opt/spark/$1/conf/spark-env.sh
-     #   export LD_LIBRARY_PATH=/opt/rh/python27/root/usr/lib64$LD_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-     #   PYSPARK_PYTHON=/opt/ipnb/bin/python2.7
-     #END
+      sudo ln -s "$3/$2/conf/hadoop" /etc/hadoop
 
       # Ensure we will be able to write to the Spark log & run directories
       for d in /var/log /var/run; do
@@ -242,6 +243,12 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/yarn-site.tpl',
     destination: spark_basedir + '/' + spark_name + "/conf/hadoop/yarn-site.tpl"
 
+    # .........................................
+    # Install a custom css for notebooks
+    vgrspark.vm.provision "08c.notebook-css",
+    type: "file",
+    source: 'buildfiles/notebook-custom.css',
+    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
     # .........................................
     # Install the TOC Notebook extension
@@ -255,14 +262,6 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/nbextensions/toc.css',
     destination: "/opt/ipnb/share/jupyter/nbextensions/toc.css"
 
-
   end
 
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  # vgrspark.vm.provision "shell", inline: <<-SHELL
-  #   sudo apt-get update
-  #   sudo apt-get install -y apache2
-  # SHELL
 end

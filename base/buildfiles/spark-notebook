@@ -185,7 +185,7 @@ service() {
       check_for_root
       test -f "${CFGNAME}-yarn" || { echo "can't find Spark config ${CFGNAME}-yarn"; exit 1; }
       test "$2" || usage
-      sed "s@{YARN-RM-HOSTNAME}@$2@" /vagrant/files/yarn-site.tpl >/opt/hadoop/etc/yarn-site.xml
+      sed "s@{YARN-RM-HOSTNAME}@$2@" /etc/hadoop/yarn-site.tpl >/etc/hadoop/yarn-site.xml
       ;;
     *)
       usage
