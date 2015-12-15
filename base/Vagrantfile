@@ -107,7 +107,7 @@ Vagrant.configure(2) do |config|
      sudo yum -y install redhat-lsb-core
     SHELL
 
-    # Install R from EPEL
+    # Install R from EPEL, plus the IR kernel for Jupyter
     vgrspark.vm.provision "02.R", 
     type: "shell", 
     privileged: true, 
@@ -151,7 +151,8 @@ Vagrant.configure(2) do |config|
     privileged: false,
     inline: <<-SHELL
      sudo rm -rf /opt/ipnb
-     sudo mkdir -m 1777 /opt/ipnb
+     sudo mkdir -m 775 /opt/ipnb
+     sudo chown vagrant.vagrant /opt/ipnb
 
      # Create a virtualenv
      scl enable python27 'virtualenv /opt/ipnb --system-site-packages'
@@ -189,12 +190,16 @@ Vagrant.configure(2) do |config|
       ./pip install ipython
       ./pip install jupyter     
 
+      ./pip install mpld3
+      ./pip install seaborn
       ./pip install pandas
       ./pip install scikit-learn
       ./pip install gensim
       ./pip install networkx
 
-      for s in ipython jupyter jupyter-notebook; do
+      ./pip install hdfs
+
+      for s in ipython jupyter jupyter-notebook hdfscli; do
         rm -f $s; ln -s wrap $s
       done
     SHELL
@@ -214,7 +219,7 @@ Vagrant.configure(2) do |config|
 
       # download & install Spark
       wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
-      sudo mkdir -m 1777 "$3"
+      sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'"
       tar zxvf "$2.tgz" -C "$3"
       sudo sh -c "echo 'PATH=\\$PATH:$3/$2/bin' > /etc/profile.d/spark-path.sh"
 
@@ -227,7 +232,16 @@ Vagrant.configure(2) do |config|
         test -d $d/spark || sudo mkdir -m 1777 $d/spark
       done
 
+     # Add a link to the installed SparkR
+     DIR=/usr/local/lib/R/library
+     test -d $DIR && sudo ln -s "$3/$2/R/lib/SparkR/" "$DIR"
+
+     # Install the (Scala) Spark kernel
+     cd $HOME/install
+     wget --no-verbose http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/spark-kernel/$1/spark-kernel-0.1.5-SNAPSHOT.tar.gz
+     tar xzf -C $3 spark-kernel-0.1.5-SNAPSHOT.tar.gz
     SHELL
+
 
     # .........................................
     # Install the Spark notebook daemon script
@@ -261,6 +275,13 @@ Vagrant.configure(2) do |config|
     type: "file", 
     source: 'buildfiles/nbextensions/toc.css',
     destination: "/opt/ipnb/share/jupyter/nbextensions/toc.css"
+
+    # Install a modified Jupyter icon
+    # (so that it's easier to identify browser tabs from the VM)
+    vgrspark.vm.provision "09c.jupyter-icon",
+    type: "file",
+    source: 'buildfiles/jupyter-favicon-custom.ico',
+    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
 
   end
 

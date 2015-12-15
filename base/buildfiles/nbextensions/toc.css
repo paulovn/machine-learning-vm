@@ -1,22 +1,41 @@
-/*extracted from https://gist.github.com/magican/5574556*/
+/* originally from https://gist.github.com/magican/5574556*/
+/* Modified for two different styles, with & without numbers */
 
 #toc {
   overflow-y: auto;
   max-height: 300px;
   padding: 0px;
+}
 
-  ol.nested {
+/* ------------ ToC with numbers -------------- */
+
+#toc ol.toc-item {
     counter-reset: item;
     list-style: none;
-  }
-  li.nested {
+    padding: 0.1em;
+}
+#toc ol.toc-item  li {
     display: block;
-  }
-  li.nested:before {
+}
+#toc ol.toc-item li:before {
+    font-size: 90%;
+    font-family: Georgia, Times New Roman, Times, serif;
     counter-increment: item;
     content: counters(item, ".")" ";
-  }
 }
+
+/* ------------ ToC without numbers ------------ */
+
+#toc ol.toc-item-noc {
+    counter-reset: item;
+    list-style-type: none;
+    padding: 0.3em;
+}
+#toc ol.toc-item-noc  li {
+    display: block;
+}
+
+/* ------------------------------------------- */
 
 #toc-wrapper {
   position: fixed;
@@ -52,7 +71,6 @@
   font-size: 14px;
   font-family: monospace;
 }
-
 
 /* don't waste so much screen space... */
 #toc-wrapper .toc-item{
