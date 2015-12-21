@@ -1,0 +1,4 @@
+[submodule "notebook"]
+	path = notebook
+	url = https://github.com/paulovn/ml-vm-notebook
+	branch = develop

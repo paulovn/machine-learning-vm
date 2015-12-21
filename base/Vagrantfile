@@ -1,0 +1,267 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+# **************************************************************************
+# Create a CentOS 6 virtual machine running a Spark Notebook process
+# **************************************************************************
+
+vagrant_command = ARGV[0]
+
+# --------------------------------------------------------------------------
+# Variables defining the installation of Spark
+
+
+# The version of Spark we will download & install
+spark_version = '1.5.0'
+spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
+
+# The place where Spark will be deployed inside the local machine
+# There is usually no need to change this
+spark_basedir = '/opt/spark'
+
+
+# --------------------------------------------------------------------------
+# Vagrant configuration
+
+# The "2" in Vagrant.configure configures the configuration version
+Vagrant.configure(2) do |config|
+
+  config.vm.define "vgr-tid-spark-base64" do |vgrspark|
+    
+    # The most common configuration options are documented and commented below.
+    # For a complete reference, please see the online documentation at
+    # https://docs.vagrantup.com.
+
+    # The base box we will be using. 
+    # Available at https://atlas.hashicorp.com/search
+    vgrspark.vm.box = "bento/centos-6.7"
+    #vgrspark.vm.box = "chef/centos-6.6"
+    #vgrspark.vm.box = "nrel/CentOS-6.5-x86_64"
+    #vgrspark.vm.box = "puphpet/centos65-x64"
+
+    # Disable automatic box update checking. If you disable this, then
+    # boxes will only be checked for updates when the user runs
+    # `vagrant box outdated`. This is not recommended.
+    # vgrspark.vm.box_check_update = false
+
+    # Put into the usual synced folder a subdirectory
+    vgrspark.vm.synced_folder ".", "/vagrant", disabled: true
+    vgrspark.vm.synced_folder "vmfiles", "/vagrant", 
+    disabled: false
+    # owner: spark_username
+    #auto_mount: false
+  
+    # Customize the virtual machine: hostname & RAM
+    vgrspark.vm.hostname = "vgr-tid-spark-base64"
+    vgrspark.vm.provider :virtualbox do |vb|
+      # Set the hostname in the provider
+      vb.name = vgrspark.vm.hostname.to_s
+      # Customize the amount of memory on the VM
+      vb.memory = "1024"
+      # Display the VirtualBox GUI when booting the machine
+      #vb.gui = true
+    end
+
+    # Networking
+    # Declare a public network
+    #vgrspark.vm.network "public_network", type: "dhcp", bridge: 'Realtek PCIe GBE Family Controller', :mac => "08002710A7ED"
+
+    # Create a forwarded port mapping which allows access to a specific port
+    # within the machine from a port on the host machine. In the example below,
+    # accessing "localhost:8080" will access port 80 on the guest machine.
+    #vgrspark.vm.network "forwarded_port", guest: port_ipython, host: port_ipython
+    #vgrspark.vm.network :forwarded_port, 
+    #host: 4040, 
+    #guest: 4040, 
+    #auto_correct: true                 # Spark UI (Driver)
+
+    # Share an additional folder to the guest VM. The first argument is
+    # the path on the host to the actual folder. The second argument is
+    # the path on the guest to mount the folder. And the optional third
+    # argument is a set of non-required options.
+    # vgrspark.vm.synced_folder "../data", "/vagrant_data"
+
+    # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
+    # such as FTP and Heroku are also available. See the documentation at
+    # https://docs.vagrantup.com/v2/push/atlas.html for more information.
+    # vgrspark.push.define "atlas" do |push|
+    #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
+    # end
+    # Push to artifactory
+    #curl -i -u<USERNAME>:<API_KEY> -T <PATH_TO_FILE> "http://artifactory.hi.inet:8081/artifactory/vagrant-machinelearning/{vagrantBoxName.box};box_name={name};box_provider={provider};box_version={version}"
+
+    vgrspark.vm.post_up_message = "**** The Vagrant Spark base machine is up"
+
+    # ---------------------------------------------------------------------
+
+    # Install some base CentOS software
+    # The development environments we need to install some Python packages
+    vgrspark.vm.provision "01.BaseSoft", 
+    type: "shell", 
+    privileged: false, 
+    inline: <<-SHELL
+     # Make some subdirectories in the vagrant home dir
+     mkdir bin install tmp
+     # Install some packages     
+     sudo yum -y install emacs-nox man
+     sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel
+     sudo yum -y install redhat-lsb-core
+    SHELL
+
+    # Install R from EPEL
+    vgrspark.vm.provision "02.R", 
+    type: "shell", 
+    privileged: true, 
+    inline: <<-SHELL
+     yum -y install epel-release
+     yum -y install R
+     yum -y install libcurl-devel libxml2-devel czmq-devel
+     mkdir -p /usr/local/lib/R/library
+     Rscript -e 'install.packages(c("rmarkdown","magrittr","dplyr","tidyr","data.table","ggplot2"),dependencies=TRUE,repos="http://cran.es.r-project.org/")'
+     Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://cran.es.r-project.org/"))'
+    SHELL
+
+    # .........................................
+    # Install Oracle JDK
+    # We download Oracle 8 from oracle.com, with the dark magic needed to 
+    # accept their license before downloading
+    vgrspark.vm.provision "03.JDK", 
+    type: "shell", 
+    inline: <<-SHELL
+     cd install
+     wget --no-verbose --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u51-b16/jdk-8u51-linux-x64.rpm"
+     sudo yum -y install jdk-8u51-linux-x64.rpm
+    SHELL
+   # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
+  # http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.tar.gz
+  # https://www.digitalocean.com/community/tutorials/how-to-install-java-on-centos-and-fedora
+
+    # .........................................
+    # Install Python 2.7 by using the Sofware Collections (SCL)
+    vgrspark.vm.provision "04.SCL-python27", type: "shell", inline: <<-SHELL
+     sudo yum -y install centos-release-SCL
+     sudo yum -y install python27 python27-scipy python27-python-virtualenv
+    SHELL
+
+    # .........................................
+    # Create a Python 2.7 virtualenv and install wrappers to point there
+    # Since Python 2.7 has been installed with SCL, we need extra magic with 
+    # LD_LIBRARY_PATH to make it run
+    vgrspark.vm.provision "05.python27-venv-create", 
+    type: "shell", 
+    privileged: false,
+    inline: <<-SHELL
+     sudo rm -rf /opt/ipnb
+     sudo mkdir -m 1777 /opt/ipnb
+
+     # Create a virtualenv
+     scl enable python27 'virtualenv /opt/ipnb --system-site-packages'
+
+     # Create a wrapper to execute virtualenv scripts
+     mkdir /opt/ipnb/bin/ext
+     cd /opt/ipnb/bin/ext
+     rm -f ipnb python2.7 pip
+     echo 'PATH=/opt/ipnb/bin:$PATH LD_LIBRARY_PATH=/opt/rh/python27/root/usr/lib64$LD_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} exec /opt/ipnb/bin/$(basename $0) "$@"' > wrap
+     chmod +x wrap
+     # Install some aliases for the wrapper
+     for s in python2.7 pip
+     do
+        ln -s wrap $s 
+     done
+
+     # Make some aliases available in the path for the vagrant user
+     cd $HOME/bin
+     ln -s /opt/ipnb/bin/ext/{python2.7,pip} .
+   SHELL
+
+    # .........................................
+    # In the virtualenv, install the Python libraries to use in the Notebooks
+    # Plus a few ML-related more
+    vgrspark.vm.provision "06.notebook-install", 
+    type: "shell", 
+    keep_color: true,
+    privileged: false, 
+    inline: <<-SHELL
+      cd /opt/ipnb/bin/ext
+      ./pip install --upgrade pip
+      ./pip install --upgrade setuptools
+      ./pip install pyparsing
+      ./pip install matplotlib
+      ./pip install ipython
+      ./pip install jupyter     
+
+      ./pip install pandas
+      ./pip install scikit-learn
+      ./pip install gensim
+      ./pip install networkx
+
+      for s in ipython jupyter jupyter-notebook; do
+        rm -f $s; ln -s wrap $s
+      done
+    SHELL
+
+    # .........................................
+    # Install Spark (and Scala, though that is not strictly necessary)
+    vgrspark.vm.provision "07.spark-install", 
+    type: "shell", 
+    privileged: false,
+    keep_color: true,    
+    args: [ spark_version, spark_name, spark_basedir ],
+    inline: <<-SHELL
+      # download & install Scala
+      cd install
+      wget --no-verbose http://downloads.typesafe.com/scala/2.10.5/scala-2.10.5.rpm
+      sudo yum -y install scala-2.10.5.rpm
+
+      # download & install Spark
+      wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
+      sudo mkdir -m 1777 "$3"
+      tar zxvf "$2.tgz" -C "$3"
+      sudo sh -c "echo 'PATH=\\$PATH:$3/$2/bin' > /etc/profile.d/spark-path.sh"
+
+      # Create the directory to place Hadoop config
+      mkdir "$3/$2/conf/hadoop"
+      sudo ln -s "$3/$2/conf/hadoop" /etc/hadoop
+
+      # Ensure we will be able to write to the Spark log & run directories
+      for d in /var/log /var/run; do
+        test -d $d/spark || sudo mkdir -m 1777 $d/spark
+      done
+
+    SHELL
+
+    # .........................................
+    # Install the Spark notebook daemon script
+    vgrspark.vm.provision "08a.notebook-script", 
+    type: "file", 
+    source: 'buildfiles/spark-notebook',
+    destination: "/opt/ipnb/bin/ext/spark-notebook"
+
+    # .........................................
+    # Install the template for Hadoop Yarn conf
+    vgrspark.vm.provision "08b.yarn-config", 
+    type: "file", 
+    source: 'buildfiles/yarn-site.tpl',
+    destination: spark_basedir + '/' + spark_name + "/conf/hadoop/yarn-site.tpl"
+
+    # .........................................
+    # Install a custom css for notebooks
+    vgrspark.vm.provision "08c.notebook-css",
+    type: "file",
+    source: 'buildfiles/notebook-custom.css',
+    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
+
+    # .........................................
+    # Install the TOC Notebook extension
+    vgrspark.vm.provision "09a.notebook-toc-extension",
+    type: "file", 
+    source: 'buildfiles/nbextensions/toc.js',
+    destination: "/opt/ipnb/share/jupyter/nbextensions/toc.js"
+
+    vgrspark.vm.provision "09b.notebook-toc-extension",
+    type: "file", 
+    source: 'buildfiles/nbextensions/toc.css',
+    destination: "/opt/ipnb/share/jupyter/nbextensions/toc.css"
+
+  end
+
+end
