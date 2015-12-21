@@ -2,7 +2,7 @@
 #
 # Starts a Spark notebook
 #
-# chkconfig: 345 87 13
+# chkconfig: 345 98 02
 # description: Spark notebook process
 #
 ### BEGIN INIT INFO
@@ -60,6 +60,7 @@ DAEMON_FLAGS=""
 
 
 start() {
+    [ -d /home/$NOTEBOOK_USER/IPNB ] || exit "notebook dir not present" 
     [ -x $EXE_FILE ] || exit $ERROR_PROGRAM_NOT_INSTALLED
     log_success_msg "Starting $DESC (${DAEMON}): "
 
@@ -71,7 +72,9 @@ start() {
     fi
 
     LOG_FILE=/var/log/spark/${DAEMON}.out
-    runuser -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
+    echo "************ Start on $(date)" > ${LOG_FILE}
+    chown $NOTEBOOK_USER ${LOG_FILE}
+    runuser -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
 
     sleep 3
 
