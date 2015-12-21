@@ -2,3 +2,6 @@
 	path = notebook
 	url = https://github.com/paulovn/ml-vm-notebook
 	branch = develop
+[submodule "base/buildfiles/nbextensions"]
+	path = base/buildfiles/nbextensions
+	url = https://github.com/paulovn/nbextensions
