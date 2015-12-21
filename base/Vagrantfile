@@ -188,9 +188,10 @@ Vagrant.configure(2) do |config|
       ./pip install ipython
       ./pip install jupyter     
 
+      ./pip install pandas
+      ./pip install statsmodels
       ./pip install mpld3
       ./pip install seaborn
-      ./pip install pandas
       ./pip install scikit-learn
       ./pip install gensim
       ./pip install networkx
