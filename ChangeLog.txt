@@ -1,0 +1,27 @@
+v. 0.9.5
+
+ * Spark updated to 1.5.2
+ * Add a slightly modified Jupyter icon
+ * Updated Java 8 (to JDK 8u65)
+ * Added more Pyhon libraries to virtualenv (statmodels, mpld3, seaborn, hdfs)
+ * Added Spark/Scala notebook kernel, for Scala 2.10.5
+     * added scala icon
+ * Notebook extensions
+     * modified ToC nbextension (suppress numbers in already numbered headings)
+     * add search-replace nbextension
+     * add toggle-headers nbextension
+ * bugfix: added chown to spark log file in daemon script
+
+
+v. 0.9.4
+
+ * Start with a Centos 6.7 box
+ * Download all needed support packages: Java 8, R, Python 2.7
+ * Create a Python virtualenv & download Python libraries for scientific computing, inc. Jupyter notebooks
+ * Add some R packages, including IRkernel
+ * Download & install Spark 1.5.0
+ * Download & install Scala 2.10
+ * Install a few other goodies
+
+The resulting Spark installation is pre-configured, but not yet started 
+in the VM.

@@ -1,5 +1,5 @@
 /* Change the background colors around the notebook */
 div#header           { background-color: #e2e2d0; }                             
 div#header-container { background-color: #e2e2d0; }
-div#header-bar       { background-color: green; }
+div#header-bar       { background-color: #e2e2d0; }
 div#notebook         { background-color: #e2e2d0; }
