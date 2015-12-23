@@ -10,6 +10,16 @@ It is managed through Vagrant. Software requirements for the host are:
 To see what is included inside the virtual machine, look at the ChangeLog
 file.
 
+The project creates a "base" VM, with all the needed software but not
+configured to launch. Another subproject defined as a submodule, in the
+[ml-notebook][nb] repository, takes care of configuring the VM for a Spark
+system accessed through Jupyter Notebook. That subproject uses the "base" 
+VM as a Vagrant box to start from.
+
+There is an additional submodule, [nbextensions][ex], which contains the
+Jupyter Notebook extensions that will be installed in the base VM (again, not
+yet configured to launch).
+
 When provisioning the virtual machine, every software needed is downloaded
 from Internet, with only one exception: the [Spark Kernel][sk] package, which
 does not have public packages. This needs to be compiled and packaged locally,
@@ -26,3 +36,5 @@ is as follows:
 
 
  [sk]: https://github.com/ibm-et/spark-kernel "Spark Kernel"
+ [nb]: https://github.com/paulovn/ml-vm-notebook "Spark notebook VM"
+ [ex]: https://github.com/paulovn/nbextensions "Jupyter Notebook extensions"
