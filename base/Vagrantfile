@@ -95,20 +95,31 @@ Vagrant.configure(2) do |config|
     # ---------------------------------------------------------------------
 
     # Install some base CentOS software
-    # The development environments we need to install some Python packages
+    # (inc. development environments we need to install some Python packages)
     vgrspark.vm.provision "01.base",
     type: "shell",
     privileged: false,
     inline: <<-SHELL
      # Make some subdirectories in the vagrant home dir
      mkdir bin install tmp
-     # Install some basic packages    type: "shell", 
+     # Install some basic packages
+     sudo yum -y install redhat-lsb-core
+     sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel
+     sudo yum -y install man emacs-nox
+    SHELL
+
+    # Install R from EPEL, plus the IR kernel for Jupyter
+    vgrspark.vm.provision "02.R", 
+    type: "shell", 
     privileged: true, 
     inline: <<-SHELL
+     yum -y install epel-release
+     yum -y install R
+     yum -y install libcurl-devel libxml2-devel czmq-devel
      mkdir -p /usr/local/lib/R/library
      echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
      yum install -y mysql-devel postgresql-devel
-     Rscript -e 'install.packages(c("rmarkdown","magrittr","dplyr","tidyr","data.table","ggplot2"),dependencies=TRUE,quiet=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"))'
+     Rscript -e 'install.packages(c("rmarkdown","magrittr","dplyr","tidyr","data.table","ggplot2"),dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=TRUE)'
      yum erase -y postgresql-devel mysql-devel
      echo "Installing IRkernel"
      Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=TRUE)'
@@ -269,7 +280,6 @@ Vagrant.configure(2) do |config|
     type: "file", 
     source: 'buildfiles/scala-spark-icon-64x64.png',
     destination: spark_basedir + '/spark-kernel/scala-spark-icon-64x64.png'
-
 
     # .........................................
     # Install a custom css for notebooks
