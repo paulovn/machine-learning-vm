@@ -28,9 +28,12 @@ is as follows:
 
     git clone https://github.com/ibm-et/spark-kernel
     cd spark-kernel
+    vagrant up
     vagrant ssh 
-    export APACHE_SPARK_VERSION=1.5.0 
+    cd /vagrant
+    export APACHE_SPARK_VERSION=1.6.0 
     export APACHE_HADOOP_VERSION=2.6.0 
+    make clean
     make build
     make dist
 

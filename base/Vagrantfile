@@ -12,13 +12,15 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '1.5.2'
+spark_version = '1.6.0p1'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
 # There is usually no need to change this
 spark_basedir = '/opt/spark'
 
+# The artifact repository where some custom-built files are kept
+repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -104,25 +106,38 @@ Vagrant.configure(2) do |config|
      mkdir bin install tmp
      # Install some basic packages
      sudo yum -y install redhat-lsb-core
-     sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel
+     sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
      sudo yum -y install man emacs-nox
     SHELL
 
-    # Install R from EPEL, plus the IR kernel for Jupyter
-    vgrspark.vm.provision "02.R", 
+    # Install R from EPEL
+    vgrspark.vm.provision "02a.R", 
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
      yum -y install epel-release
      yum -y install R
-     yum -y install libcurl-devel libxml2-devel czmq-devel
+    SHELL
+
+
+    # Install some R packages & the IR kernel for Jupyter
+    vgrspark.vm.provision "02b.Rpkg", 
+    type: "shell", 
+    privileged: true, 
+    inline: <<-SHELL
      mkdir -p /usr/local/lib/R/library
      echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
-     yum install -y mysql-devel postgresql-devel
-     Rscript -e 'install.packages(c("rmarkdown","magrittr","dplyr","tidyr","data.table","ggplot2"),dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=TRUE)'
+     yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel
+     for pkg in '"rmarkdown","magrittr"' \
+                '"dplyr","tidyr"' \
+                '"data.table","ggplot2"'
+     do
+         echo -e "\nInstalling R packages: $pkg"
+         Rscript -e "install.packages(c($pkg),dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
+     done
      yum erase -y postgresql-devel mysql-devel
      echo "Installing IRkernel"
-     Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=TRUE)'
+     Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
     SHELL
 
     # .........................................
@@ -137,12 +152,14 @@ Vagrant.configure(2) do |config|
      sudo yum -y install jdk-8u65-linux-x64.rpm
     SHELL
    # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
-  # http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.tar.gz
-  # https://www.digitalocean.com/community/tutorials/how-to-install-java-on-centos-and-fedora
+   # http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.tar.gz
+   # https://www.digitalocean.com/community/tutorials/how-to-install-java-on-centos-and-fedora
 
     # .........................................
     # Install Python 2.7 by using the Sofware Collections (SCL)
-    vgrspark.vm.provision "04.python27-SCL", type: "shell", inline: <<-SHELL
+    vgrspark.vm.provision "04.python27-SCL", 
+    type: "shell", 
+    inline: <<-SHELL
      sudo yum -y install centos-release-SCL
      sudo yum -y install python27 python27-scipy python27-python-virtualenv
     SHELL
@@ -160,7 +177,7 @@ Vagrant.configure(2) do |config|
      sudo chown vagrant.vagrant /opt/ipnb
 
      # Create a virtualenv
-     scl enable python27 'virtualenv /opt/ipnb --system-site-packages'
+     scl enable python27 'virtualenv /opt/ipnb --no-site-packages'
 
      # Create a wrapper to execute virtualenv scripts
      mkdir /opt/ipnb/bin/ext
@@ -191,7 +208,7 @@ Vagrant.configure(2) do |config|
       cd /opt/ipnb/bin/ext
       ./pip install --upgrade pip
       ./pip install --upgrade setuptools
-      # this is to avoid InsecurePlatformWarning messages
+      # we install this is to avoid InsecurePlatformWarning messages
       ./pip install 'requests[security]'
 
       ./pip install pyparsing
@@ -208,6 +225,7 @@ Vagrant.configure(2) do |config|
       ./pip install networkx
 
       ./pip install hdfs
+      ./pip install xlrd
 
       for s in ipython jupyter jupyter-notebook hdfscli; do
         rm -f $s; ln -s wrap $s
@@ -215,8 +233,8 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # .........................................
-    # Install Spark (and Scala, though that is not strictly necessary)
-    vgrspark.vm.provision "07a.spark",
+    # Install Scala
+    vgrspark.vm.provision "07.scala",
     type: "shell", 
     privileged: false,
     keep_color: true,    
@@ -226,71 +244,93 @@ Vagrant.configure(2) do |config|
       cd install
       wget --no-verbose http://downloads.typesafe.com/scala/2.10.5/scala-2.10.5.rpm
       sudo yum -y install scala-2.10.5.rpm
+    SHELL
+
+    # .........................................
+    # Install Spark
+    vgrspark.vm.provision "08a.spark",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    args: [ spark_version, spark_name, spark_basedir, repo_base ],
+    inline: <<-SHELL
 
       # download & install Spark
+      cd install
       wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
-      sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'"
+      sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'; cd $3; ln -s $2/ current"
       tar zxvf "$2.tgz" -C "$3"
-      sudo sh -c "echo 'PATH=\\$PATH:$3/$2/bin' > /etc/profile.d/spark-path.sh"
+      sudo sh -c "echo 'PATH=\\$PATH:$3/current/bin' > /etc/profile.d/spark-path.sh"
+
+      # download & install the Spark Streaming Kafka artifact
+      ARTIFACT=spark-streaming-kafka-assembly_2.10
+      wget --no-verbose http://search.maven.org/remotecontent?filepath=org/apache/spark/$ARTIFACT/$1/$ARTIFACT-$1.jar -O $ARTIFACT-$1.jar
+      mkdir $3/$2/lib/external
+      mv $ARTIFACT-$1.jar $3/$2/lib/external
 
       # Create the directory to place Hadoop config
-      mkdir "$3/$2/conf/hadoop"
-      sudo ln -s "$3/$2/conf/hadoop" /etc/hadoop
+      mkdir "$3/current/conf/hadoop"
+      sudo rm -f /etc/hadoop
+      sudo ln -s "$3/current/conf/hadoop" /etc/hadoop
 
       # Ensure we will be able to write to the Spark log & run directories
       for d in /var/log /var/run; do
         test -d $d/spark || sudo mkdir -m 1777 $d/spark
       done
 
-      # Add a link to the installed SparkR
+      # Add to the R library a link to the installed SparkR package
       DIR=/usr/local/lib/R/library
-      test -d $DIR && sudo ln -s "$3/$2/R/lib/SparkR/" "$DIR"
+      if [ -d $DIR ]; then
+         sudo rm -f "$DIR/SparkR"
+         sudo ln -s "$3/$2/R/lib/SparkR/" "$DIR"
+      fi
     SHELL
 
-    # .........................................
-    # Install the template for Hadoop Yarn conf
-    vgrspark.vm.provision "07b.yarn-config",
-    type: "file",
-    source: 'buildfiles/yarn-site.tpl',
-    destination: spark_basedir + '/' + spark_name + "/conf/hadoop/yarn-site.tpl"
 
     # .........................................
     # Install the Spark notebook daemon script
-    vgrspark.vm.provision "07c.notebook-script", 
+    vgrspark.vm.provision "08b.config",
+    type: "file",
+    source: 'buildfiles/conf',
+    destination: '/opt/spark/current'
+
+
+    # .........................................
+    # Install the Spark notebook daemon script
+    vgrspark.vm.provision "08c.notebook-script", 
     type: "file", 
     source: "buildfiles/spark-notebook",
     destination: "/opt/ipnb/bin/ext/spark-notebook"
 
     # .........................................
     # Install the Scala Spark kernel
-    vgrspark.vm.provision "07b.scala-kernel", 
+    vgrspark.vm.provision "09a.scala-kernel", 
     type: "shell",
     privileged: false,
     keep_color: true,
-    args: [ spark_version, spark_name, spark_basedir ],
+    args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
       # Install the (Scala) Spark kernel
       cd $HOME/install
-      PKG=spark-kernel-0.1.5-SNAPSHOT-spark1.5.2.tar.gz
-      wget --no-verbose http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/spark-kernel/$1/$PKG
-      tar xzvf $PKG -C $3
+      PKG=spark-kernel-0.1.5-SNAPSHOT-spark${1}.tar.gz
+      wget --no-verbose "${4}spark-kernel/$1/$PKG && tar xzvf $PKG -C $3"
     SHELL
 
-    vgrspark.vm.provision "07c.spark-kernel.icon",
+    vgrspark.vm.provision "09b.spark-kernel.icon",
     type: "file", 
     source: 'buildfiles/scala-spark-icon-64x64.png',
     destination: spark_basedir + '/spark-kernel/scala-spark-icon-64x64.png'
 
     # .........................................
     # Install a custom css for notebooks
-    vgrspark.vm.provision "09a.notebook-css",
+    vgrspark.vm.provision "10a.notebook-css",
     type: "file",
     source: "buildfiles/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
     # Install a modified Jupyter icon
     # (so that it's easier to identify browser tabs from the VM)
-    vgrspark.vm.provision "09b.jupyter-icon",
+    vgrspark.vm.provision "10b.jupyter-icon",
     type: "file",
     source: 'buildfiles/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
@@ -298,35 +338,17 @@ Vagrant.configure(2) do |config|
     # .........................................
     # Install the notebook extensions
 
-    vgrspark.vm.provision "10a.notebook.ext.toc",
-    type: "file",
-    source: 'buildfiles/nbextensions/toc.js',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/toc.js"
+    vgrspark.vm.provision "11.notebook.ext",
+    type: 'file',
+    source: 'buildfiles/nbextensions',
+    destination: '/opt/ipnb/share/jupyter'
 
-    vgrspark.vm.provision "10b.notebook.ext.toc",
-    type: "file",
-    source: 'buildfiles/nbextensions/toc.css',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/toc.css"
 
-    vgrspark.vm.provision "10c.notebook.ext.search",
-    type: "file",
-    source: 'buildfiles/nbextensions/search-replace.js',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/search-replace.js"
-
-    vgrspark.vm.provision "10d.notebook.ext.search",
-    type: "file",
-    source: 'buildfiles/nbextensions/search-replace.css',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/search-replace.css"
-
-    vgrspark.vm.provision "10e.notebook.ext.hdr",
-    type: "file",
-    source: 'buildfiles/nbextensions/toggle-headers.js',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/toggle-headers.js"
-
-    vgrspark.vm.provision "10f.notebook.ext.hdr",
-    type: "file",
-    source: 'buildfiles/nbextensions/toggle-headers.css',
-    destination: "/opt/ipnb/share/jupyter/nbextensions/toggle-headers.css"
+    vgrspark.vm.provision "12.clean",
+    type: "shell",
+    inline: <<-SHELL
+       rm -rf /opt/ipnb/share/jupyter/.git
+    SHELL
 
   end
 
