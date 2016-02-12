@@ -12,7 +12,7 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '1.6.0p1'
+spark_version = '1.6.0'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
@@ -111,7 +111,7 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # Install R from EPEL
-    vgrspark.vm.provision "02a.R", 
+    vgrspark.vm.provision "02.R", 
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
@@ -121,7 +121,7 @@ Vagrant.configure(2) do |config|
 
 
     # Install some R packages & the IR kernel for Jupyter
-    vgrspark.vm.provision "02b.Rpkg", 
+    vgrspark.vm.provision "03.Rpkg", 
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
@@ -144,7 +144,7 @@ Vagrant.configure(2) do |config|
     # Install Oracle JDK
     # We download Oracle 8 from oracle.com, with the dark magic needed to 
     # accept their license before downloading
-    vgrspark.vm.provision "03.JDK", 
+    vgrspark.vm.provision "04.JDK", 
     type: "shell", 
     inline: <<-SHELL
      cd install
@@ -157,7 +157,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Python 2.7 by using the Sofware Collections (SCL)
-    vgrspark.vm.provision "04.python27-SCL", 
+    vgrspark.vm.provision "05.python27-SCL", 
     type: "shell", 
     inline: <<-SHELL
      sudo yum -y install centos-release-SCL
@@ -168,7 +168,7 @@ Vagrant.configure(2) do |config|
     # Create a Python 2.7 virtualenv and install wrappers to point there
     # Since Python 2.7 has been installed with SCL, we need extra magic with 
     # LD_LIBRARY_PATH to make it run
-    vgrspark.vm.provision "05.python27.venv",
+    vgrspark.vm.provision "06.python27.venv",
     type: "shell", 
     privileged: false,
     inline: <<-SHELL
@@ -200,7 +200,7 @@ Vagrant.configure(2) do |config|
     # .........................................
     # In the virtualenv, install the Python libraries to use in the Notebooks
     # Plus a few ML-related more
-    vgrspark.vm.provision "06.notebook",
+    vgrspark.vm.provision "07.notebook",
     type: "shell", 
     keep_color: true,
     privileged: false, 
@@ -234,7 +234,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Scala
-    vgrspark.vm.provision "07.scala",
+    vgrspark.vm.provision "08.scala",
     type: "shell", 
     privileged: false,
     keep_color: true,    
@@ -246,9 +246,10 @@ Vagrant.configure(2) do |config|
       sudo yum -y install scala-2.10.5.rpm
     SHELL
 
+
     # .........................................
     # Install Spark
-    vgrspark.vm.provision "08a.spark",
+    vgrspark.vm.provision "10.spark",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -261,12 +262,6 @@ Vagrant.configure(2) do |config|
       sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'; cd $3; ln -s $2/ current"
       tar zxvf "$2.tgz" -C "$3"
       sudo sh -c "echo 'PATH=\\$PATH:$3/current/bin' > /etc/profile.d/spark-path.sh"
-
-      # download & install the Spark Streaming Kafka artifact
-      ARTIFACT=spark-streaming-kafka-assembly_2.10
-      wget --no-verbose http://search.maven.org/remotecontent?filepath=org/apache/spark/$ARTIFACT/$1/$ARTIFACT-$1.jar -O $ARTIFACT-$1.jar
-      mkdir $3/$2/lib/external
-      mv $ARTIFACT-$1.jar $3/$2/lib/external
 
       # Create the directory to place Hadoop config
       mkdir "$3/current/conf/hadoop"
@@ -286,25 +281,50 @@ Vagrant.configure(2) do |config|
       fi
     SHELL
 
+    # .........................................
+    # Install some Spark add-ons
+    vgrspark.vm.provision "11.spark-ext",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    args: [ spark_version, spark_name, spark_basedir, repo_base ],
+    inline: <<-SHELL
+
+      EXT_DIR="$3/current/lib/ext"
+      mkdir $EXT_DIR
+
+      # download & install the Spark Streaming Kafka artifact
+      ARTIFACT=spark-streaming-kafka-assembly_2.10
+      wget --no-verbose http://search.maven.org/remotecontent?filepath=org/apache/spark/$ARTIFACT/$1/$ARTIFACT-$1.jar -O $ARTIFACT-$1.jar
+      mv $ARTIFACT-$1.jar $EXT_DIR
+
+      # download & install the Spark CSV artifact, plus its dependency
+      ARTIFACT=spark-csv_2.10-1.3.0
+      wget --no-verbose http://central.maven.org/maven2/com/databricks/spark-csv_2.10/1.3.0/$ARTIFACT.jar
+      mv $ARTIFACT.jar $EXT_DIR
+      ARTIFACT=commons-csv-1.2
+      wget --no-verbose http://central.maven.org/maven2/org/apache/commons/commons-csv/1.2/$ARTIFACT.jar
+      mv $ARTIFACT.jar $EXT_DIR
+
+    SHELL
 
     # .........................................
-    # Install the Spark notebook daemon script
-    vgrspark.vm.provision "08b.config",
+    # Install the Spark configuration files for the different modes
+    vgrspark.vm.provision "12.config",
     type: "file",
     source: 'buildfiles/conf',
     destination: '/opt/spark/current'
 
-
     # .........................................
     # Install the Spark notebook daemon script
-    vgrspark.vm.provision "08c.notebook-script", 
+    vgrspark.vm.provision "13.daemon-script", 
     type: "file", 
     source: "buildfiles/spark-notebook",
     destination: "/opt/ipnb/bin/ext/spark-notebook"
 
     # .........................................
     # Install the Scala Spark kernel
-    vgrspark.vm.provision "09a.scala-kernel", 
+    vgrspark.vm.provision "14.scala-kernel", 
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -313,24 +333,25 @@ Vagrant.configure(2) do |config|
       # Install the (Scala) Spark kernel
       cd $HOME/install
       PKG=spark-kernel-0.1.5-SNAPSHOT-spark${1}.tar.gz
-      wget --no-verbose "${4}spark-kernel/$1/$PKG && tar xzvf $PKG -C $3"
+      wget --no-verbose "${4}spark-kernel/$1/$PKG" && tar xzvf "$PKG" -C "$3"
     SHELL
 
-    vgrspark.vm.provision "09b.spark-kernel.icon",
+    vgrspark.vm.provision "15.scala-kernel.icon",
     type: "file", 
     source: 'buildfiles/scala-spark-icon-64x64.png',
     destination: spark_basedir + '/spark-kernel/scala-spark-icon-64x64.png'
 
+
     # .........................................
     # Install a custom css for notebooks
-    vgrspark.vm.provision "10a.notebook-css",
+    vgrspark.vm.provision "20.notebook-css",
     type: "file",
     source: "buildfiles/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
     # Install a modified Jupyter icon
     # (so that it's easier to identify browser tabs from the VM)
-    vgrspark.vm.provision "10b.jupyter-icon",
+    vgrspark.vm.provision "21.jupyter-icon",
     type: "file",
     source: 'buildfiles/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
@@ -338,17 +359,14 @@ Vagrant.configure(2) do |config|
     # .........................................
     # Install the notebook extensions
 
-    vgrspark.vm.provision "11.notebook.ext",
+    vgrspark.vm.provision "22.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: '/opt/ipnb/share/jupyter'
 
-
-    vgrspark.vm.provision "12.clean",
+    vgrspark.vm.provision "23.clean",
     type: "shell",
-    inline: <<-SHELL
-       rm -rf /opt/ipnb/share/jupyter/.git
-    SHELL
+    inline: "rm -rf /opt/ipnb/share/jupyter/.git"
 
   end
 

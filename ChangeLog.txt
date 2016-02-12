@@ -1,3 +1,14 @@
+v. 0.9.8
+ * added a missing dependency for spark-csv
+ * config option for extra path to include spark-csv (commented out)
+
+v. 0.9.7
+
+ * Spark is 1.6.0
+ * Added configuration of Spark mode + cluster addr via script
+ * Default network mode is bridged mode, to enable access to remote execution
+ * Added additional jars (Kafka Spark Streaming, Spark CSV)
+
 v. 0.9.5
 
  * Spark updated to 1.5.2

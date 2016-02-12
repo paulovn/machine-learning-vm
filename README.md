@@ -1,6 +1,12 @@
 # machine-learning-vm
 
-This project contains the needed files to generate a virtual machine for
+*Note: if you just want to set up a running Spark virtual machine, you do not 
+need this project. Use the [ml-notebook][nb] project instead, that one will 
+download the packaged base box and launch the VM automatically. This one is 
+for building the VM from scratch*
+
+
+This project contains the files needed to generate a virtual machine for
 Machine Learning/Data Science tasks.
 
 It is managed through Vagrant. Software requirements for the host are:
@@ -17,8 +23,8 @@ system accessed through Jupyter Notebook. That subproject uses the "base"
 VM as a Vagrant box to start from.
 
 There is an additional submodule, [nbextensions][ex], which contains the
-Jupyter Notebook extensions that will be installed in the base VM (again, not
-yet configured to launch).
+Jupyter Notebook extensions that will be copied to the base VM (note they are
+*not* configured to automatically be included in notebooks) 
 
 When provisioning the virtual machine, every software needed is downloaded
 from Internet, with only one exception: the [Spark Kernel][sk] package, which
