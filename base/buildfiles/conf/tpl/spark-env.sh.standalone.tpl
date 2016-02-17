@@ -12,7 +12,8 @@ localip()
 
 # Set the local IP that Spark advertises
 # Try first eth1, which will usually be the bridged network
-SPARK_LOCAL_IP=$(localip eth1 eth0)
+test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
+
 #SPARK_PUBLIC_DNS=
 #SPARK_LOCAL_HOSTNAME=
 #SPARK_PUBLIC_DNS=
