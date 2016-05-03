@@ -9,4 +9,4 @@ spark.eventLog.enabled=true
 spark.eventLog.dir=/var/log/spark
 
 # This is needed if we use the SparkCSV library
-#spark.driver.extraClassPath=/opt/spark/current/lib/ext/spark-csv_2.10-1.3.0.jar:/opt/spark/current/lib/ext/commons-csv-1.2.jar
+#spark.driver.extraClassPath=/opt/spark/current/lib/ext/spark-csv_2.10-1.4.0.jar:/opt/spark/current/lib/ext/commons-csv-1.2.jar

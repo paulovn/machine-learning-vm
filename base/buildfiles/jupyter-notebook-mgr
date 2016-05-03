@@ -6,8 +6,8 @@
 # description: Spark notebook process
 #
 ### BEGIN INIT INFO
-# Provides:          ipython-notebook
-# Short-Description: IPython notebook
+# Provides:          jupyter-notebook
+# Short-Description: Jupyter notebook
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
 # Required-Start:    $syslog $remote_fs
@@ -20,16 +20,16 @@
 . /lib/lsb/init-functions
 
 # Slurp the Spark notebook configuration
-CFGNAME=/etc/sysconfig/ipython-notebook
+CFGNAME=/etc/sysconfig/jupyter-notebook
 set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
-NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/home/${NOTEBOOK_USER}/bin/pyspark-nb}
+NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/ext/jupyter-notebook}
 
 
-DESC="IPython Notebook"
-DAEMON="ipython-notebook"
+DESC="Jupyter Notebook"
+DAEMON="jupyter-notebook"
 VARDIR="/var/run/ipython"
 PIDFILE="$VARDIR/$DAEMON.pid"
 LOCKDIR="/var/lock/subsys"
@@ -83,7 +83,7 @@ start() {
 
 stop() {
     log_success_msg "Stopping $DESC (${DAEMON}): "
-    killproc -p $PIDFILE ipython-notebook
+    killproc -p $PIDFILE jupyter-notebook
     RETVAL=$?
 
     [ $RETVAL -eq $RETVAL_SUCCESS ] && rm -f $LOCKFILE $PIDFILE
