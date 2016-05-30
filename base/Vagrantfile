@@ -110,6 +110,8 @@ Vagrant.configure(2) do |config|
      sudo yum -y install openblas-devel
      # General utility programs
      sudo yum -y install man nc emacs-nox nano
+     # Other
+     sudo yum -y install graphviz
      # Make some subdirectories in the vagrant home dir
      mkdir bin install tmp
     SHELL
@@ -227,9 +229,6 @@ Vagrant.configure(2) do |config|
       ./pip install ipython
       ./pip install jupyter     
 
-      ./pip install theano
-      ./pip install keras
-
       ./pip install h5py
       ./pip install tables
 
@@ -241,14 +240,16 @@ Vagrant.configure(2) do |config|
       ./pip install gensim
       ./pip install networkx
 
+      ./pip install theano
+      ./pip install keras
+      ./pip install pydot-ng
+
       ./pip install hdfs
       ./pip install xlrd
       ./pip install openpyxl
 
-      # AI
-      #./pip install sparql-kernel
-
-      sudo yum -y erase hdf5-devel
+      # We don't need this anymore
+      sudo yum -y erase hdf5-devel openblas-devel
 
       for s in ipython jupyter jupyter-notebook hdfscli; do
         rm -f $s; ln -s wrap $s
@@ -408,6 +409,24 @@ Vagrant.configure(2) do |config|
     vgrspark.vm.provision "23.clean",
     type: "shell",
     inline: "rm -rf /opt/ipnb/share/jupyter/.git"
+
+    # .........................................
+    # Install the additional packages for the AI course
+    # Do it only if the environment variable PROVISION_NBCONVERT has a 1 value
+    if (ENV['PROVISION_AI'] == '1')
+      vgrspark.vm.provision "11.ai",
+        type: "shell",
+        run: "never",
+        keep_color: true,
+        inline: <<-SHELL
+          echo "Installing AI packages"
+
+          sudo yum -y install python27-tkinter
+          ./pip install nltk
+          ./pip install https://github.com/paulovn/sparql-kernel/archive/feature/first-version.zip
+          ./pip install https://github.com/paulovn/aiml-chatbot-kernel/archive/feature/initial-version.zip
+        SHELL
+    end
 
   end
 
