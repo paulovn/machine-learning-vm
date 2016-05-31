@@ -293,9 +293,9 @@ Vagrant.configure(2) do |config|
       sudo rm -f /etc/hadoop
       sudo ln -s "$3/current/conf/hadoop" /etc/hadoop
 
-      # Ensure we will be able to write to the Spark log & run directories
+      # Ensure we will be able to write to the Notebook log & run directories
       for d in /var/log /var/run; do
-        test -d $d/spark || sudo mkdir -m 1777 $d/spark
+        test -d $d/ipnb || sudo mkdir -m 1777 $d/ipnb
       done
 
       # Add to the R library a link to the installed SparkR package
@@ -391,8 +391,8 @@ Vagrant.configure(2) do |config|
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
-    # Install a modified Jupyter icon
-    # (so that it's easier to identify browser tabs from the VM)
+    # Install a slightly modified Jupyter icon
+    # (so that it's easier to identify browser tabs belonging to the VM)
     vgrspark.vm.provision "21.jupyter-icon",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
@@ -404,11 +404,11 @@ Vagrant.configure(2) do |config|
     vgrspark.vm.provision "22.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
-    destination: '/opt/ipnb/share/jupyter/nbextensions'
+    destination: '/opt/ipnb/share/jupyter'
 
     vgrspark.vm.provision "23.clean",
     type: "shell",
-    inline: "rm -rf /opt/ipnb/share/jupyter/.git"
+    inline: "rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*"
 
     # .........................................
     # Install the additional packages for the AI course

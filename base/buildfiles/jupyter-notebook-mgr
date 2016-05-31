@@ -26,11 +26,11 @@ test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
 NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/ext/jupyter-notebook}
-export LOGDIR={$LOGDIR:-/var/log/ipnb}
+export LOGDIR=${LOGDIR:-/var/log/ipnb}
 
 DESC="Jupyter Notebook"
 DAEMON="jupyter-notebook"
-VARDIR="/var/run/ipython"
+VARDIR="/var/run/ipnb"
 PIDFILE="$VARDIR/$DAEMON.pid"
 LOCKDIR="/var/lock/subsys"
 LOCKFILE="$LOCKDIR/$DAEMON"
@@ -51,7 +51,10 @@ EXEC_PATH=$NOTEBOOK_SCRIPT
 EXEC_DIR=""
 DAEMON_FLAGS=""
 
-[ -d "$VARDIR" ]  || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER $VARDIR 1>/dev/null 2>&1 || :
+for d in "$VARDIR" "LOGDIR"
+do
+    [ -d "$d" ]  || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER "$d" 1>/dev/null 2>&1 || :
+done
 [ -d "$LOCKDIR" ] || install -d -m 0755 $LOCKDIR 1>/dev/null 2>&1 || :
 
 
