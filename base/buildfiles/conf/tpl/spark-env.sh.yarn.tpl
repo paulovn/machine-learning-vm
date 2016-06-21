@@ -21,9 +21,9 @@ test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 PYSPARK_PYTHON=python2.7
 PYSPARK_SUBMIT_ARGS="--master yarn-client --deploy-mode client  --driver-memory 1536M  --num-executors 16 --executor-cores 2 --executor-memory 1g"
 
-# This is for running in Yarn modes
-HADOOP_CONF_DIR=/opt/spark/current/conf/hadoop
-YARN_CONF_DIR=/opt/spark/current/conf/hadoop
+# This is for running in YARN modes
+HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}
+YARN_CONF_DIR=${YARN_CONF_DIR:-/opt/spark/current/conf/hadoop}
 #YARN_OPTS="--conf spark.yarn.historyServer.address={HOSTNAME-SPARK-HS}"
 
 

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Wrapper script to execute a Python kernel with Spark
+
+# Put command line arguments in env so they are received by the Python kernel
+export PYSPARK_DRIVER_PYTHON=/opt/ipnb/bin/ext/python2.7
+export PYSPARK_DRIVER_PYTHON_OPTS="$@"
+
+# Launch Pyspark with no arguments -- it will fetch options from spark config
+/opt/spark/current/bin/pyspark

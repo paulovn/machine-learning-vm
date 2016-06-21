@@ -1,0 +1,9 @@
+/* Change the background colors around the notebook */
+div#header           { background-color: #e2e2d0; }
+div#header-container { background-color: #e2e2d0; }
+div#header-bar       { background-color: #e2e2d0; }
+div#notebook         { background-color: #e2e2d0; }
+
+/* This is for the pages showing terminals */
+body.terminal-app div#header		{ background-color: #eeeeee; }
+body.terminal-app div#header-container	{ background-color: #eeeeee; }

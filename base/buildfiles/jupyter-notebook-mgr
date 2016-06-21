@@ -6,8 +6,8 @@
 # description: Spark notebook process
 #
 ### BEGIN INIT INFO
-# Provides:          spark-notebook
-# Short-Description: Spark IPython notebook
+# Provides:          jupyter-notebook
+# Short-Description: Jupyter notebook
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
 # Required-Start:    $syslog $remote_fs
@@ -20,17 +20,17 @@
 . /lib/lsb/init-functions
 
 # Slurp the Spark notebook configuration
-CFGNAME=/etc/sysconfig/spark-notebook
+CFGNAME=/etc/sysconfig/jupyter-notebook
 set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
-NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/home/${NOTEBOOK_USER}/bin/pyspark-nb}
+NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/ext/jupyter-notebook}
+export LOGDIR=${LOGDIR:-/var/log/ipnb}
 
-
-DESC="Spark Notebook"
-DAEMON="spark-notebook"
-VARDIR="/var/run/spark"
+DESC="Jupyter Notebook"
+DAEMON="jupyter-notebook"
+VARDIR="/var/run/ipnb"
 PIDFILE="$VARDIR/$DAEMON.pid"
 LOCKDIR="/var/lock/subsys"
 LOCKFILE="$LOCKDIR/$DAEMON"
@@ -51,7 +51,10 @@ EXEC_PATH=$NOTEBOOK_SCRIPT
 EXEC_DIR=""
 DAEMON_FLAGS=""
 
-[ -d "$VARDIR" ]  || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER $VARDIR 1>/dev/null 2>&1 || :
+for d in "$VARDIR" "LOGDIR"
+do
+    [ -d "$d" ]  || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER "$d" 1>/dev/null 2>&1 || :
+done
 [ -d "$LOCKDIR" ] || install -d -m 0755 $LOCKDIR 1>/dev/null 2>&1 || :
 
 
@@ -67,10 +70,10 @@ start() {
         exit 0
     fi
 
-    LOG_FILE=/var/log/spark/${DAEMON}.out
+    LOG_FILE=${LOGDIR}/${DAEMON}.out
     echo "************ Start on $(date)" >> ${LOG_FILE}
     chown $NOTEBOOK_USER ${LOG_FILE}
-    runuser -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
+    runuser -l -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
 
     sleep 3
 
@@ -83,7 +86,7 @@ start() {
 
 stop() {
     log_success_msg "Stopping $DESC (${DAEMON}): "
-    killproc -p $PIDFILE pyspark-notebook
+    killproc -p $PIDFILE jupyter-notebook
     RETVAL=$?
 
     [ $RETVAL -eq $RETVAL_SUCCESS ] && rm -f $LOCKFILE $PIDFILE
