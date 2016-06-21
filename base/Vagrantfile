@@ -28,6 +28,9 @@ repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buil
 # The "2" in Vagrant.configure configures the configuration version
 Vagrant.configure(2) do |config|
 
+  # This is to help later when packaging: don't change the insecure key
+  config.ssh.insert_key = false
+
   config.vm.define "vgr-tid-spark-base64" do |vgrspark|
     
     # The most common configuration options are documented and commented below.
@@ -37,9 +40,6 @@ Vagrant.configure(2) do |config|
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
     vgrspark.vm.box = "bento/centos-6.7"
-    #vgrspark.vm.box = "chef/centos-6.6"
-    #vgrspark.vm.box = "nrel/CentOS-6.5-x86_64"
-    #vgrspark.vm.box = "puphpet/centos65-x64"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
@@ -373,10 +373,11 @@ Vagrant.configure(2) do |config|
     args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
       # Install the (Scala) Spark kernel
-      cd $HOME/install
-      PKG=toree-0.1.0.dev5.tar.gz
-      #wget --no-verbose "${4}spark-kernel/$1/$PKG"
-      pip install /vagrant/$PKG 
+      pip install toree
+      #cd $HOME/install
+      #PKG=toree-0.1.0.dev5.tar.gz
+      ##wget --no-verbose "${4}spark-kernel/$1/$PKG"
+      #pip install /vagrant/$PKG 
     SHELL
 
     vgrspark.vm.provision "16.kernel-icons",
@@ -422,9 +423,10 @@ Vagrant.configure(2) do |config|
           echo "Installing AI packages"
 
           sudo yum -y install python27-tkinter
-          ./pip install nltk
-          ./pip install https://github.com/paulovn/sparql-kernel/archive/feature/first-version.zip
-          ./pip install https://github.com/paulovn/aiml-chatbot-kernel/archive/feature/initial-version.zip
+          cd /opt/ipnb/bin/ext
+          ./pip install nltk graphviz
+          ./pip install https://github.com/paulovn/sparql-kernel/archive/master.zip
+          ./pip install https://github.com/paulovn/aiml-chatbot-kernel/archive/master.zip
         SHELL
     end
 

@@ -1,3 +1,22 @@
+v. 0.9.12
+ * R updated to 3.3.0
+ * Python updated to 2.7.8
+ * bugfix in notebook service script
+ * Updated Toree kernel
+
+v. 0.9.11
+ * bugfixes
+
+v. 0.9.10
+ * Spark is 1.6.1
+ * Spark Kernel changed to Toree
+ * Added additional Python packages (Theano, Keras, Openpyxl, xlrd, h5py,
+   tables)
+ * R updated to 3.2.3
+ * Added additional R packages: caret
+ * Configured to allow 2 Python kernal: a base 2.7 and a Pyspark kernel
+ * Added a couple of additional notebook extensions
+
 v. 0.9.8
  * added a missing dependency for spark-csv
  * config option for extra path to include spark-csv (commented out)
