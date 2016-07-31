@@ -1,3 +1,11 @@
+v. 0.9.13
+ * Spark updated to 1.6.2
+ * Added graphviz Python package
+ * Added a system theanorc file
+ * Install openblas
+ * Updated to the most recent available versions of Python & R packages
+ * Reduced Spark log levels
+
 v. 0.9.12
  * R updated to 3.3.0
  * Python updated to 2.7.8

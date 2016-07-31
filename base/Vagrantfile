@@ -1,4 +1,4 @@
-# -*- mode: ruby -*-
+# -*- mode: ruby  encoding: iso-8859-1  -*-  
 # vi: set ft=ruby :
 # **************************************************************************
 # Create a CentOS 6 virtual machine with all the software needed to
@@ -12,7 +12,7 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '1.6.1'
+spark_version = '1.6.2'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
@@ -167,7 +167,7 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     inline: <<-SHELL
      sudo yum -y install centos-release-SCL centos-release-scl
-     sudo yum -y install python27 python27-scipy python27-python-virtualenv
+     sudo yum -y install python27 python27-python-virtualenv
     SHELL
 
     # In order to compile code that requires C++11 we need:
@@ -196,12 +196,11 @@ Vagrant.configure(2) do |config|
      echo 'PATH=/opt/ipnb/bin:$PATH LD_LIBRARY_PATH=/opt/rh/python27/root/usr/lib64$LD_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} exec /opt/ipnb/bin/$(basename $0) "$@"' > wrap
      chmod +x wrap
      # Install some aliases for the wrapper
-     for s in python2.7 pip
-     do
+     for s in python2.7 pip; do
         ln -s wrap $s 
      done
 
-     # Make some aliases available in the path for the vagrant user
+     # Make aliases available in the path for the vagrant user
      cd $HOME/bin
      rm python2.7 pip
      ln -s /opt/ipnb/bin/ext/{python2.7,pip} .
@@ -216,7 +215,7 @@ Vagrant.configure(2) do |config|
     privileged: false, 
     inline: <<-SHELL
 
-      sudo yum -y install hdf5-devel
+      sudo yum -y install openblas-devel hdf5-devel
 
       cd /opt/ipnb/bin/ext
       ./pip install --upgrade pip
@@ -234,24 +233,26 @@ Vagrant.configure(2) do |config|
 
       ./pip install pandas
       ./pip install statsmodels
-      ./pip install mpld3
-      ./pip install seaborn
       ./pip install scikit-learn
       ./pip install gensim
       ./pip install networkx
+      ./pip install mpld3
+      ./pip install seaborn
 
       ./pip install theano
       ./pip install keras
       ./pip install pydot-ng
+      ./pip install graphviz
 
       ./pip install hdfs
       ./pip install xlrd
       ./pip install openpyxl
 
       # We don't need this anymore
-      sudo yum -y erase hdf5-devel openblas-devel
+      sudo yum -y erase hdf5-devel
 
-      for s in ipython jupyter jupyter-notebook hdfscli; do
+      # Wrap some Python command-line scripts so that they can be executed
+      for s in ipython jupyter jupyter-notebook jupyter-nbconvert hdfscli; do
         rm -f $s; ln -s wrap $s
       done
     SHELL
@@ -386,22 +387,22 @@ Vagrant.configure(2) do |config|
     destination: spark_basedir
 
     # .........................................
-    # Install a custom css for notebooks
+    # Install some files for notebooks
+
+    # a custom css
     vgrspark.vm.provision "20.notebook-css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
-    # Install a slightly modified Jupyter icon
+    # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
     vgrspark.vm.provision "21.jupyter-icon",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
 
-    # .........................................
-    # Install the notebook extensions
-
+    # the notebook extensions
     vgrspark.vm.provision "22.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
@@ -411,17 +412,27 @@ Vagrant.configure(2) do |config|
     type: "shell",
     inline: "rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*"
 
+    # the theanorc file
+    vgrspark.vm.provision "24a.theanorc",
+    type: 'file',
+    source: 'buildfiles/theanorc',
+    destination: '/tmp/theanorc'
+
+    vgrspark.vm.provision "24b.theanorc",
+    type: 'shell',
+    privileged: true,
+    inline: 'cp -p /tmp/theanorc /etc/theanorc'
+
+
     # .........................................
     # Install the additional packages for the AI course
-    # Do it only if the environment variable PROVISION_NBCONVERT has a 1 value
+    # Do it only if the environment variable PROVISION_AI has a 1 value
     if (ENV['PROVISION_AI'] == '1')
-      vgrspark.vm.provision "11.ai",
+      vgrspark.vm.provision "40.ai",
         type: "shell",
-        run: "never",
         keep_color: true,
         inline: <<-SHELL
           echo "Installing AI packages"
-
           sudo yum -y install python27-tkinter
           cd /opt/ipnb/bin/ext
           ./pip install nltk graphviz
