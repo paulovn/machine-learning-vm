@@ -1,4 +1,4 @@
-# -*- mode: ruby  encoding: iso-8859-1  -*-  
+# -*- mode: ruby  encoding: iso-8859-1  -*-
 # vi: set ft=ruby :
 # **************************************************************************
 # Create a CentOS 6 virtual machine with all the software needed to
@@ -104,6 +104,8 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
      # Just in case there are problems with the EPEL repo SSL certificates
      sudo yum upgrade ca-certificates --disablerepo=epel
+     # Make some subdirectories in the vagrant home dir
+     mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
      sudo yum -y install redhat-lsb-core
      sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
@@ -112,8 +114,6 @@ Vagrant.configure(2) do |config|
      sudo yum -y install man nc emacs-nox nano
      # Other
      sudo yum -y install graphviz
-     # Make some subdirectories in the vagrant home dir
-     mkdir bin install tmp
     SHELL
 
     # Install R from EPEL
@@ -437,7 +437,7 @@ Vagrant.configure(2) do |config|
           cd /opt/ipnb/bin/ext
           ./pip install nltk graphviz
           ./pip install https://github.com/paulovn/sparql-kernel/archive/master.zip
-          ./pip install https://github.com/paulovn/aiml-chatbot-kernel/archive/master.zip
+          ./pip install aimlbotkernel
         SHELL
     end
 
