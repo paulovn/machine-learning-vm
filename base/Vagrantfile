@@ -143,7 +143,9 @@ Vagrant.configure(2) do |config|
      done
      yum erase -y postgresql-devel mysql-devel
      echo "Installing IRkernel"
-     Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     Rscript -e 'install.packages( c("crayon","pbdZMQ","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
+     #Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
     SHELL
 
     # .........................................
@@ -163,7 +165,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Python 2.7 by using the Sofware Collections (SCL)
-    vgrspark.vm.provision "05.python27-SCL", 
+    vgrspark.vm.provision "10.py27.scl", 
     type: "shell", 
     inline: <<-SHELL
      sudo yum -y install centos-release-SCL centos-release-scl
@@ -178,7 +180,7 @@ Vagrant.configure(2) do |config|
     # Create a Python 2.7 virtualenv and install wrappers to point there
     # Since Python 2.7 has been installed with SCL, we need extra magic with 
     # LD_LIBRARY_PATH to make it run
-    vgrspark.vm.provision "06.python27.venv",
+    vgrspark.vm.provision "11.py27.venv",
     type: "shell", 
     privileged: false,
     inline: <<-SHELL
@@ -189,17 +191,31 @@ Vagrant.configure(2) do |config|
      # Create a virtualenv
      scl enable python27 'virtualenv /opt/ipnb --no-site-packages'
 
-     # Create a wrapper to execute virtualenv scripts
-     mkdir /opt/ipnb/bin/ext
+     # Create the dir where to put wrapper scripts
+     mkdir -p /opt/ipnb/bin/ext
      cd /opt/ipnb/bin/ext
-     rm -f ipnb python2.7 pip
-     echo 'PATH=/opt/ipnb/bin:$PATH LD_LIBRARY_PATH=/opt/rh/python27/root/usr/lib64$LD_LIBRARY_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} exec /opt/ipnb/bin/$(basename $0) "$@"' > wrap
+     rm -f wrap python2.7 pip
+   SHELL
+
+    # .........................................
+    # Create a Python 2.7 virtualenv and install wrappers to point there
+    # Since Python 2.7 has been installed with SCL, we need extra magic with 
+    # LD_LIBRARY_PATH to make it run. The wrap script does that
+    vgrspark.vm.provision "12.py27.wrap",
+    type: "file",
+    source: 'buildfiles/wrap',
+    destination: '/opt/ipnb/bin/ext/wrap'
+
+    vgrspark.vm.provision "13.py27.aliases",
+    type: "shell", 
+    privileged: false,
+    inline: <<-SHELL
+     cd /opt/ipnb/bin/ext
      chmod +x wrap
      # Install some aliases for the wrapper
      for s in python2.7 pip; do
         ln -s wrap $s 
      done
-
      # Make aliases available in the path for the vagrant user
      cd $HOME/bin
      rm python2.7 pip
@@ -207,14 +223,13 @@ Vagrant.configure(2) do |config|
    SHELL
 
     # .........................................
-    # In the virtualenv, install the Python libraries to use in the Notebooks
+    # In the virtualenv, install the Python packages to use in the Notebooks
     # Plus a few ML-related more
-    vgrspark.vm.provision "07.notebook",
+    vgrspark.vm.provision "14.py27.pkg",
     type: "shell", 
     keep_color: true,
     privileged: false, 
     inline: <<-SHELL
-
       sudo yum -y install openblas-devel hdf5-devel
 
       cd /opt/ipnb/bin/ext
@@ -259,7 +274,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Scala
-    vgrspark.vm.provision "08.scala",
+    vgrspark.vm.provision "20.scala",
     type: "shell", 
     privileged: false,
     keep_color: true,    
@@ -274,7 +289,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Spark
-    vgrspark.vm.provision "10.spark",
+    vgrspark.vm.provision "30.spark",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -309,7 +324,9 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install some Spark add-ons
-    vgrspark.vm.provision "11.spark-ext",
+    # (note: GraphFrames will be automatically downloaded on execution,
+    # if activated via spark.jars.packages)
+    vgrspark.vm.provision "31.spark.ext",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -319,13 +336,13 @@ Vagrant.configure(2) do |config|
       EXT_DIR="$3/current/lib/ext"
       mkdir -p $EXT_DIR
 
-      # download & install the Spark Streaming Kafka artifact
+      # Download & install the Spark Streaming Kafka artifact
       ARTIFACT=spark-streaming-kafka-assembly_2.10
       echo ". Downloading $ARTIFACT"
       wget --no-verbose http://search.maven.org/remotecontent?filepath=org/apache/spark/$ARTIFACT/$1/$ARTIFACT-$1.jar -O $ARTIFACT-$1.jar
       mv $ARTIFACT-$1.jar $EXT_DIR
 
-      # download & install the Spark CSV artifact, plus its dependency
+      # Download & install the Spark CSV artifact, plus its dependency
       ARTIFACT_VERSION=1.4.0
       ARTIFACT=spark-csv_2.10-$ARTIFACT_VERSION
       echo ". Downloading $ARTIFACT"
@@ -336,38 +353,32 @@ Vagrant.configure(2) do |config|
       wget --no-verbose http://central.maven.org/maven2/org/apache/commons/commons-csv/$ARTIFACT_VERSION/$ARTIFACT.jar
       mv $ARTIFACT.jar $EXT_DIR
 
-      ARTIFACT_VERSION=0.1.0-spark1.6
-      ARTIFACT=graphframes-$ARTIFACT_VERSION
-      echo ". Downloading $ARTIFACT"
-      wget --no-verbose http://dl.bintray.com/spark-packages/maven/graphframes/graphframes/$ARTIFACT_VERSION/$ARTIFACT.jar
-      mv $ARTIFACT.jar $EXT_DIR
-
     SHELL
 
     # .........................................
     # Install the Spark configuration files for the different modes
-    vgrspark.vm.provision "12.config",
+    vgrspark.vm.provision "32.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
     destination: '/opt/spark/current'
 
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vgrspark.vm.provision "13.daemon-script", 
+    vgrspark.vm.provision "33.notebook-script", 
     type: "file",
     source: "buildfiles/jupyter-notebook-mgr",
     destination: "/opt/ipnb/bin/ext/jupyter-notebook-mgr"
 
     # .........................................
     # Install the Pyspark script wrapper
-    vgrspark.vm.provision "14.pyspark-wrapper",
+    vgrspark.vm.provision "34.pyspark-wrapper",
     type: "file",
     source: "buildfiles/pyspark-ipnb",
     destination: "/opt/ipnb/bin/ext/pyspark-ipnb"
 
     # .........................................
     # Install the Toree Scala/Spark kernel
-    vgrspark.vm.provision "15.scala-kernel",
+    vgrspark.vm.provision "35.scala-kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -381,7 +392,7 @@ Vagrant.configure(2) do |config|
       #pip install /vagrant/$PKG 
     SHELL
 
-    vgrspark.vm.provision "16.kernel-icons",
+    vgrspark.vm.provision "36.kernel-icons",
     type: "file", 
     source: 'buildfiles/style/kernel-icons',
     destination: spark_basedir
@@ -390,35 +401,35 @@ Vagrant.configure(2) do |config|
     # Install some files for notebooks
 
     # a custom css
-    vgrspark.vm.provision "20.notebook-css",
+    vgrspark.vm.provision "40.notebook-css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
-    vgrspark.vm.provision "21.jupyter-icon",
+    vgrspark.vm.provision "41.jupyter-icon",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
 
     # the notebook extensions
-    vgrspark.vm.provision "22.notebook.ext",
+    vgrspark.vm.provision "42.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: '/opt/ipnb/share/jupyter'
 
-    vgrspark.vm.provision "23.clean",
+    vgrspark.vm.provision "43.clean",
     type: "shell",
     inline: "rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*"
 
     # the theanorc file
-    vgrspark.vm.provision "24a.theanorc",
+    vgrspark.vm.provision "44.theanorc",
     type: 'file',
     source: 'buildfiles/theanorc',
     destination: '/tmp/theanorc'
 
-    vgrspark.vm.provision "24b.theanorc",
+    vgrspark.vm.provision "45.theanorc",
     type: 'shell',
     privileged: true,
     inline: 'cp -p /tmp/theanorc /etc/theanorc'
@@ -428,15 +439,15 @@ Vagrant.configure(2) do |config|
     # Install the additional packages for the AI course
     # Do it only if the environment variable PROVISION_AI has a 1 value
     if (ENV['PROVISION_AI'] == '1')
-      vgrspark.vm.provision "40.ai",
+      vgrspark.vm.provision "50.ai",
         type: "shell",
         keep_color: true,
         inline: <<-SHELL
           echo "Installing AI packages"
           sudo yum -y install python27-tkinter
           cd /opt/ipnb/bin/ext
-          ./pip install nltk graphviz
-          ./pip install https://github.com/paulovn/sparql-kernel/archive/master.zip
+          ./pip install nltk
+          ./pip install sparqlkernel
           ./pip install aimlbotkernel
         SHELL
     end
