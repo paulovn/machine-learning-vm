@@ -13,3 +13,6 @@ spark.eventLog.dir=/var/log/ipnb
 
 # This is needed if we use the Graphframes library
 #spark.jars.packages=graphframes:graphframes:0.2.0-spark1.6-s_2.10
+
+# And this if we need Kafka integration in Spark Streaming. Using Kafka 0.10
+#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-10_2.11:2.0.0

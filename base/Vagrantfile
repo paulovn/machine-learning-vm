@@ -12,7 +12,7 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '1.6.2'
+spark_version = '2.0.0'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
@@ -23,6 +23,19 @@ spark_basedir = '/opt/spark'
 repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
 
 # --------------------------------------------------------------------------
+# Some variables that affect Vagrant execution
+
+# Check the command requested
+vagrant_command = ARGV[0]
+
+# Conditionally activate some provision sections
+provision_run_ai  = ENV['PROVISION_AI'] == '1' || \
+        (vagrant_command == 'provision' && ARGV.include?('60.ai'))
+provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
+        (vagrant_command == 'provision' && ARGV.include?('70.clean'))
+
+
+# --------------------------------------------------------------------------
 # Vagrant configuration
 
 # The "2" in Vagrant.configure configures the configuration version
@@ -31,7 +44,7 @@ Vagrant.configure(2) do |config|
   # This is to help later when packaging: don't change the insecure key
   config.ssh.insert_key = false
 
-  config.vm.define "vgr-tid-spark-base64" do |vgrspark|
+  config.vm.define "vgr-tid-spark-base64-7" do |vgrspark|
     
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
@@ -39,7 +52,7 @@ Vagrant.configure(2) do |config|
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vgrspark.vm.box = "bento/centos-6.7"
+    vgrspark.vm.box = "bento/centos-7.2"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
@@ -102,17 +115,18 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: false,
     inline: <<-SHELL
-     # Just in case there are problems with the EPEL repo SSL certificates
-     sudo yum upgrade ca-certificates --disablerepo=epel
+     sudo yum install epel-release
      # Make some subdirectories in the vagrant home dir
      mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
      sudo yum -y install redhat-lsb-core
      sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
      sudo yum -y install openblas-devel
+     sudo yum -y install python-virtualenv
      # General utility programs
      sudo yum -y install man nc emacs-nox nano
      # Other
+     (cd /etc/yum.repos.d; wget http://www.graphviz.org/graphviz-rhel.repo)
      sudo yum -y install graphviz
     SHELL
 
@@ -156,8 +170,10 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     inline: <<-SHELL
      cd install
-     wget --no-verbose --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u65-b17/jdk-8u65-linux-x64.rpm"
-     sudo yum -y install jdk-8u65-linux-x64.rpm
+     VERSION=8u101
+     echo "Downloading jdk-$VERSION"
+     wget --no-verbose --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/${VERSION}-b13/jdk-${VERSION}-linux-x64.rpm"
+     sudo yum -y install jdk-${VERSION}-linux-x64.rpm
     SHELL
    # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
    # http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.tar.gz
@@ -165,12 +181,12 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install Python 2.7 by using the Sofware Collections (SCL)
-    vgrspark.vm.provision "10.py27.scl", 
-    type: "shell", 
-    inline: <<-SHELL
-     sudo yum -y install centos-release-SCL centos-release-scl
-     sudo yum -y install python27 python27-python-virtualenv
-    SHELL
+#    vgrspark.vm.provision "10.py27.scl", 
+#    type: "shell", 
+#    inline: <<-SHELL
+#     sudo yum -y install centos-release-SCL centos-release-scl
+#     sudo yum -y install python27 python27-python-virtualenv
+#    SHELL
 
     # In order to compile code that requires C++11 we need:
     # sudo yum -y install devtoolset-3-gcc-c++ devtoolset-3-gcc-gfortran
@@ -178,8 +194,6 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Create a Python 2.7 virtualenv and install wrappers to point there
-    # Since Python 2.7 has been installed with SCL, we need extra magic with 
-    # LD_LIBRARY_PATH to make it run
     vgrspark.vm.provision "11.py27.venv",
     type: "shell", 
     privileged: false,
@@ -189,38 +203,14 @@ Vagrant.configure(2) do |config|
      sudo chown vagrant.vagrant /opt/ipnb
 
      # Create a virtualenv
-     scl enable python27 'virtualenv /opt/ipnb --no-site-packages'
+     virtualenv /opt/ipnb --no-site-packages
 
-     # Create the dir where to put wrapper scripts
-     mkdir -p /opt/ipnb/bin/ext
-     cd /opt/ipnb/bin/ext
-     rm -f wrap python2.7 pip
-   SHELL
-
-    # .........................................
-    # Create a Python 2.7 virtualenv and install wrappers to point there
-    # Since Python 2.7 has been installed with SCL, we need extra magic with 
-    # LD_LIBRARY_PATH to make it run. The wrap script does that
-    vgrspark.vm.provision "12.py27.wrap",
-    type: "file",
-    source: 'buildfiles/wrap',
-    destination: '/opt/ipnb/bin/ext/wrap'
-
-    vgrspark.vm.provision "13.py27.aliases",
-    type: "shell", 
-    privileged: false,
-    inline: <<-SHELL
-     cd /opt/ipnb/bin/ext
-     chmod +x wrap
-     # Install some aliases for the wrapper
-     for s in python2.7 pip; do
-        ln -s wrap $s 
-     done
-     # Make aliases available in the path for the vagrant user
      cd $HOME/bin
      rm python2.7 pip
-     ln -s /opt/ipnb/bin/ext/{python2.7,pip} .
+     ln -s /opt/ipnb/bin/{python2.7,pip} .
+
    SHELL
+
 
     # .........................................
     # In the virtualenv, install the Python packages to use in the Notebooks
@@ -232,7 +222,7 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
       sudo yum -y install openblas-devel hdf5-devel
 
-      cd /opt/ipnb/bin/ext
+      cd /opt/ipnb/bin
       ./pip install --upgrade pip
       ./pip install --upgrade setuptools
       # we install this is to avoid InsecurePlatformWarning messages
@@ -266,10 +256,6 @@ Vagrant.configure(2) do |config|
       # We don't need this anymore
       sudo yum -y erase hdf5-devel
 
-      # Wrap some Python command-line scripts so that they can be executed
-      for s in ipython jupyter jupyter-notebook jupyter-nbconvert hdfscli; do
-        rm -f $s; ln -s wrap $s
-      done
     SHELL
 
     # .........................................
@@ -282,8 +268,10 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
       # download & install Scala
       cd install
-      wget --no-verbose http://downloads.typesafe.com/scala/2.10.5/scala-2.10.5.rpm
-      sudo yum -y install scala-2.10.5.rpm
+      VERSION=2.11.8
+      echo "Downloading Scala $VERSION"
+      wget --no-verbose http://downloads.lightbend.com/scala/$VERSION/scala-$VERSION.rpm
+      sudo yum -y install scala-$VERSION.rpm
     SHELL
 
 
@@ -323,37 +311,10 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # .........................................
-    # Install some Spark add-ons
-    # (note: GraphFrames will be automatically downloaded on execution,
-    # if activated via spark.jars.packages)
-    vgrspark.vm.provision "31.spark.ext",
-    type: "shell",
-    privileged: false,
-    keep_color: true,
-    args: [ spark_version, spark_name, spark_basedir, repo_base ],
-    inline: <<-SHELL
-
-      EXT_DIR="$3/current/lib/ext"
-      mkdir -p $EXT_DIR
-
-      # Download & install the Spark Streaming Kafka artifact
-      ARTIFACT=spark-streaming-kafka-assembly_2.10
-      echo ". Downloading $ARTIFACT"
-      wget --no-verbose http://search.maven.org/remotecontent?filepath=org/apache/spark/$ARTIFACT/$1/$ARTIFACT-$1.jar -O $ARTIFACT-$1.jar
-      mv $ARTIFACT-$1.jar $EXT_DIR
-
-      # Download & install the Spark CSV artifact, plus its dependency
-      ARTIFACT_VERSION=1.4.0
-      ARTIFACT=spark-csv_2.10-$ARTIFACT_VERSION
-      echo ". Downloading $ARTIFACT"
-      wget --no-verbose http://central.maven.org/maven2/com/databricks/spark-csv_2.10/$ARTIFACT_VERSION/$ARTIFACT.jar
-      mv $ARTIFACT.jar $EXT_DIR
-      ARTIFACT_VERSION=1.2
-      ARTIFACT=commons-csv-$ARTIFACT_VERSION
-      wget --no-verbose http://central.maven.org/maven2/org/apache/commons/commons-csv/$ARTIFACT_VERSION/$ARTIFACT.jar
-      mv $ARTIFACT.jar $EXT_DIR
-
-    SHELL
+    # No Spark add-ons installed
+    #  * spark-csv is now part of Spark 2.0
+    #  * GraphFrames & Kafka Streaming can be declared as packages in
+    #    Spark config and they will be automatically downloaded
 
     # .........................................
     # Install the Spark configuration files for the different modes
@@ -367,14 +328,14 @@ Vagrant.configure(2) do |config|
     vgrspark.vm.provision "33.notebook-script", 
     type: "file",
     source: "buildfiles/jupyter-notebook-mgr",
-    destination: "/opt/ipnb/bin/ext/jupyter-notebook-mgr"
+    destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
 
     # .........................................
     # Install the Pyspark script wrapper
     vgrspark.vm.provision "34.pyspark-wrapper",
     type: "file",
     source: "buildfiles/pyspark-ipnb",
-    destination: "/opt/ipnb/bin/ext/pyspark-ipnb"
+    destination: "/opt/ipnb/bin/pyspark-ipnb"
 
     # .........................................
     # Install the Toree Scala/Spark kernel
@@ -385,11 +346,11 @@ Vagrant.configure(2) do |config|
     args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
       # Install the (Scala) Spark kernel
-      pip install toree
-      #cd $HOME/install
-      #PKG=toree-0.1.0.dev5.tar.gz
-      ##wget --no-verbose "${4}spark-kernel/$1/$PKG"
-      #pip install /vagrant/$PKG 
+      #pip install toree
+      cd $HOME/install
+      PKG=toree-0.2.0.dev1.tar.gz
+      #wget --no-verbose "${4}spark-kernel/$1/$PKG"
+      pip install /vagrant/$PKG 
     SHELL
 
     vgrspark.vm.provision "36.kernel-icons",
@@ -419,38 +380,49 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/nbextensions',
     destination: '/opt/ipnb/share/jupyter'
 
-    vgrspark.vm.provision "43.clean",
-    type: "shell",
-    inline: "rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*"
-
+    # .........................................
     # the theanorc file
-    vgrspark.vm.provision "44.theanorc",
+    vgrspark.vm.provision "50.theanorc",
     type: 'file',
     source: 'buildfiles/theanorc',
     destination: '/tmp/theanorc'
 
-    vgrspark.vm.provision "45.theanorc",
+    vgrspark.vm.provision "51.theanorc",
     type: 'shell',
     privileged: true,
     inline: 'cp -p /tmp/theanorc /etc/theanorc'
 
-
     # .........................................
     # Install the additional packages for the AI course
     # Do it only if the environment variable PROVISION_AI has a 1 value
-    if (ENV['PROVISION_AI'] == '1')
-      vgrspark.vm.provision "50.ai",
+    if (provision_run_ai)
+      vgrspark.vm.provision "60.ai",
         type: "shell",
         keep_color: true,
         inline: <<-SHELL
           echo "Installing AI packages"
           sudo yum -y install python27-tkinter
-          cd /opt/ipnb/bin/ext
+          cd /opt/ipnb/bin
           ./pip install nltk
           ./pip install sparqlkernel
           ./pip install aimlbotkernel
         SHELL
     end
+
+    # Clean
+    if (provision_run_clean)
+      vgrspark.vm.provision "70.clean",
+      type: "shell",
+      privileged: true,
+      inline: <<-SHELL
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
+        rm -rf /home/vagrant/.cache/pip /home/vagrant/.bash_history /home/vagrant/install/*
+        rm -rf /tmp/Rtmp* /var/tmp/yum*
+        sudo yum clean all
+      SHELL
+    end
+
+
 
   end
 
