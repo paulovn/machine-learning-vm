@@ -12,7 +12,7 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '2.0.0'
+spark_version = '2.0.1'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
@@ -53,6 +53,9 @@ Vagrant.configure(2) do |config|
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
     vgrspark.vm.box = "bento/centos-7.2"
+    vgrspark.vm.box_version = "2.2.9"
+    # v. 2.3.0 has a regression problem with some VirtualBox versions
+    # see https://github.com/chef/bento/issues/688
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs

@@ -2,4 +2,7 @@
 *.old
 .ipnb_checkpoints
 *.log
+
 *~
+#*#
+.#*#

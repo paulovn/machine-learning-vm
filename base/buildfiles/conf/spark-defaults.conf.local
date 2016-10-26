@@ -8,11 +8,9 @@ spark.master=local[*]
 spark.eventLog.enabled=true
 spark.eventLog.dir=/var/log/ipnb
 
-# This is needed if we use the SparkCSV library
-#spark.driver.extraClassPath=/opt/spark/current/lib/ext/spark-csv_2.10-1.4.0.jar:/opt/spark/current/lib/ext/commons-csv-1.2.jar
-
 # This is needed if we use the Graphframes library
-#spark.jars.packages=graphframes:graphframes:0.2.0-spark1.6-s_2.10
+#spark.jars.packages=graphframes:graphframes:0.2.0-spark2.0-s_2.11
 
-# And this if we need Kafka integration in Spark Streaming. Using Kafka 0.10
-#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-10_2.11:2.0.0
+# And this if we need Kafka integration in Spark Streaming. Using Kafka 0.8
+# (since the 0.10 version w/ the new consumer API does not yet work in Python) 
+#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.0.1
