@@ -13,4 +13,4 @@ spark.eventLog.dir=/var/log/ipnb
 
 # And this if we need Kafka integration in Spark Streaming. Using Kafka 0.8
 # (since the 0.10 version w/ the new consumer API does not yet work in Python) 
-#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.0.1
+#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.0.2
