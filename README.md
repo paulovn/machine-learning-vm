@@ -8,7 +8,8 @@ for building the VM from scratch*
 
 This project contains the files needed to generate a virtual machine for
 Machine Learning/Data Science tasks. When provisioning the virtual machine, 
-every required piece software is downloaded from Internet. To see what is included inside the virtual machine, look at the ChangeLog file.
+every required piece software is downloaded from Internet. To see what is 
+included inside the virtual machine, look at the ChangeLog file.
 
 
 The VM is managed through Vagrant. Software requirements for the host are:
