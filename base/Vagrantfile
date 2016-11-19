@@ -12,7 +12,7 @@ vagrant_command = ARGV[0]
 
 
 # The version of Spark we will download & install
-spark_version = '2.0.1'
+spark_version = '2.0.2'
 spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
@@ -133,23 +133,44 @@ Vagrant.configure(2) do |config|
      sudo yum -y install graphviz
     SHELL
 
+    # .........................................
+    # We install now OpenJDK 8 instead of Oracle 8
+    vgrspark.vm.provision "02.jdk",
+    type: "shell", 
+    inline: <<-SHELL
+     sudo yum -y install java-1.8.0-openjdk-devel
+
+     #cd install
+     #VERSION=8u111
+     #echo "Downloading jdk-$VERSION"
+     #download Oracle 8 from oracle.com, with the dark magic needed to 
+     #accept their license before downloading
+     #wget --no-verbose --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/${VERSION}-b14/jdk-${VERSION}-linux-x64.rpm"
+     #sudo yum -y install jdk-${VERSION}-linux-x64.rpm
+
+    SHELL
+   # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
+
     # Install R from EPEL
-    vgrspark.vm.provision "02.R", 
+    vgrspark.vm.provision "03.R", 
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
      yum -y install epel-release
-     yum -y install R
+     # The plain R metapackage would install also R-java-devel, which depends
+     # on "java-devel", and thus installs openjdk 7 (since OpenJDK 8 does not
+     # provide "java-devel")
+     yum -y install R-core R-core-devel
     SHELL
 
     # Install some R packages & the IR kernel for Jupyter
-    vgrspark.vm.provision "03.Rpkg", 
+    vgrspark.vm.provision "04.Rpkg", 
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
      mkdir -p /usr/local/lib/R/library
      echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
-     yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel
+     yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel cairo-devel libssh2-devel
      for pkg in '"rmarkdown","magrittr"' \
                 '"dplyr","tidyr"' \
                 '"data.table","ggplot2"' \
@@ -158,29 +179,13 @@ Vagrant.configure(2) do |config|
          echo -e "\nInstalling R packages: $pkg"
          Rscript -e "install.packages(c($pkg),dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
      done
-     yum erase -y postgresql-devel mysql-devel
      echo "Installing IRkernel"
      Rscript -e 'install.packages( c("crayon","pbdZMQ","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
      #Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
     SHELL
 
-    # .........................................
-    # Install Oracle JDK
-    # We download Oracle 8 from oracle.com, with the dark magic needed to 
-    # accept their license before downloading
-    vgrspark.vm.provision "04.JDK", 
-    type: "shell", 
-    inline: <<-SHELL
-     cd install
-     VERSION=8u101
-     echo "Downloading jdk-$VERSION"
-     wget --no-verbose --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/${VERSION}-b13/jdk-${VERSION}-linux-x64.rpm"
-     sudo yum -y install jdk-${VERSION}-linux-x64.rpm
-    SHELL
-   # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
-   # http://download.oracle.com/otn-pub/java/jdk/7u71-b14/jdk-7u71-linux-x64.tar.gz
-   # https://www.digitalocean.com/community/tutorials/how-to-install-java-on-centos-and-fedora
 
     # .........................................
     # Install Python 2.7 by using the Sofware Collections (SCL)
@@ -409,6 +414,7 @@ Vagrant.configure(2) do |config|
           ./pip install nltk
           ./pip install sparqlkernel
           ./pip install aimlbotkernel
+          ./pip install quiver
         SHELL
     end
 
