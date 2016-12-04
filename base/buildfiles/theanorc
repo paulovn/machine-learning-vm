@@ -4,9 +4,9 @@
 
 [blas]
 # This makes it link directly to the system installed OpenBLAS
-# ldflags = -L/usr/lib64 -lopenblas -lgfortran
+ldflags = -L/usr/lib64 -lopenblas -lgfortran
 
 # This removes direct linking, letting it use the NumPy-linked BLAS instead
 # (theoretically it is slower, however it depends on how optimized BLAS
 # implementations are)
-ldflags = 
+#ldflags = 

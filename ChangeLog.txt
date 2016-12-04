@@ -1,10 +1,13 @@
 v. 1.9.3
  * Spark is 2.0.2
+ * added sparklyr
+ * notebook daemon started as Systemd service
+ * theanorc modified for explicit linking to openblas
 
 v. 1.9.2
  * Spark is 2.0.1
  * Uses OpenJDK 1.8 instead of Oracle Java 8
- * R installation refactored to avou pulling in Java 1.7
+ * R installation refactored to avoid pulling in Java 1.7
 
 v. 1.9.1
  * Spark is 2.0.0

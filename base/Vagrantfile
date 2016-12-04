@@ -183,6 +183,8 @@ Vagrant.configure(2) do |config|
      Rscript -e 'install.packages( c("crayon","pbdZMQ","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
      #Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     echo "Installing sparklyr"
+     Rscript -e 'install.packages( "sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
     SHELL
 
@@ -214,8 +216,8 @@ Vagrant.configure(2) do |config|
      virtualenv /opt/ipnb --no-site-packages
 
      cd $HOME/bin
-     rm python2.7 pip
-     ln -s /opt/ipnb/bin/{python2.7,pip} .
+     rm python python2.7 pip
+     ln -s /opt/ipnb/bin/{python,python2.7,pip} .
 
    SHELL
 
@@ -339,15 +341,27 @@ Vagrant.configure(2) do |config|
     destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
 
     # .........................................
+    # Install the Systemd unit file to manage the notebook server
+    vgrspark.vm.provision "34a.notebook-systemd",
+    type: "file",
+    source: "buildfiles/notebook.service",
+    destination: "/tmp/notebook.service"
+
+    vgrspark.vm.provision "34b.notebook-systemd",
+    type: "shell",
+    privileged: true,
+    inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
+
+    # .........................................
     # Install the Pyspark script wrapper
-    vgrspark.vm.provision "34.pyspark-wrapper",
+    vgrspark.vm.provision "35.pyspark-wrapper",
     type: "file",
     source: "buildfiles/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
 
     # .........................................
     # Install the Toree Scala/Spark kernel
-    vgrspark.vm.provision "35.scala-kernel",
+    vgrspark.vm.provision "36.scala-kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -361,10 +375,6 @@ Vagrant.configure(2) do |config|
       pip install /vagrant/$PKG 
     SHELL
 
-    vgrspark.vm.provision "36.kernel-icons",
-    type: "file", 
-    source: 'buildfiles/style/kernel-icons',
-    destination: spark_basedir
 
     # .........................................
     # Install some files for notebooks
@@ -383,19 +393,26 @@ Vagrant.configure(2) do |config|
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
 
     # the notebook extensions
-    vgrspark.vm.provision "42.notebook.ext",
+    vgrspark.vm.provision "42.notebook-ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: '/opt/ipnb/share/jupyter'
 
+    # icons for Pyspark & Scala kernels
+    vgrspark.vm.provision "43.kernel-icons",
+    type: "file", 
+    source: 'buildfiles/style/kernel-icons',
+    destination: spark_basedir
+
+
     # .........................................
     # the theanorc file
-    vgrspark.vm.provision "50.theanorc",
+    vgrspark.vm.provision "50a.theanorc",
     type: 'file',
     source: 'buildfiles/theanorc',
     destination: '/tmp/theanorc'
 
-    vgrspark.vm.provision "51.theanorc",
+    vgrspark.vm.provision "50b.theanorc",
     type: 'shell',
     privileged: true,
     inline: 'cp -p /tmp/theanorc /etc/theanorc'
