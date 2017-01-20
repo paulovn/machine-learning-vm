@@ -1,3 +1,25 @@
+v. 1.9.3
+ * Spark is 2.0.2
+ * added sparklyr
+ * notebook daemon started as Systemd service
+ * theanorc modified for explicit linking to openblas
+
+v. 1.9.2
+ * Spark is 2.0.1
+ * Uses OpenJDK 1.8 instead of Oracle Java 8
+ * R installation refactored to avoid pulling in Java 1.7
+
+v. 1.9.1
+ * Spark is 2.0.0
+ * R is 3.3.1
+ * Based on CentOS 7.2 (w/ Python 2.7.5)
+ * No Python SCL installation (uses system Python 2.7)
+ * IPython 5.1.0
+ * Removed Spark add-ons (csv is built-in, graphframes can be downloaded on
+   the fly)
+
+v. 1.0.0
+
 v. 0.9.13
  * Spark updated to 1.6.2
  * Added graphviz Python package

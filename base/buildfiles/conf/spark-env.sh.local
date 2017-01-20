@@ -1,7 +1,13 @@
-# In local mode we do not set Hadoop config, else the default FS would 
-# point to HDFS
+# Environment variables to add to all Spark processes
+# ---------------------------------------------------
+
+# In local mode we do not want set Hadoop config, else the default FS 
+# would point to HDFS
 unset HADOOP_CONF_DIR
 #HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}
 
-PYSPARK_PYTHON=/opt/ipnb/bin/ext/python2.7
+# Set the Python to use for executors
+PYSPARK_PYTHON=/opt/ipnb/bin/python2.7
+
+# Default arguments for job submission
 PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 --executor-cores 2 --executor-memory 1g'

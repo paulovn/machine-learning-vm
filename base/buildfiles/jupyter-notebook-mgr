@@ -25,7 +25,7 @@ set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
-NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/ext/jupyter-notebook}
+NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}
 export LOGDIR=${LOGDIR:-/var/log/ipnb}
 
 DESC="Jupyter Notebook"

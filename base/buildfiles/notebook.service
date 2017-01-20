@@ -1,0 +1,13 @@
+[Unit]
+Description=IPython notebook server
+
+[Service]
+Type=forking
+ExecStart=/opt/ipnb/bin/jupyter-notebook-mgr start
+ExecStop=/opt/ipnb/bin/jupyter-notebook-mgr stop
+PIDFile=/var/run/ipnb/jupyter-notebook.pid         
+KillMode=none                                      
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
