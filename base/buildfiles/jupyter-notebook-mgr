@@ -150,14 +150,16 @@ set_mode()
     check_for_root
     test -f "/opt/spark/current/conf/spark-env.sh.$MODE" || { log_failure_msg "Error: config for $MODE missing. Probably needs set-addr"; return 1; }
     #test -f "${CFGNAME}.$MODE" || { log_failure_msg "can't find Spark config ${CFGNAME}.$MODE"; return 1; }
-    stop
+    checkstatusofproc && RUNNING=1
+    test "$RUNNING" && { stop || return 1; }
     #echo "$MODE" > ${CFGNAME}
     (cd /opt/spark/current/conf; \
 	rm -f spark-env.sh spark-defaults.conf; \
 	ln -s spark-env.sh.$MODE spark-env.sh; \
 	ln -s spark-defaults.conf.$MODE spark-defaults.conf) 
     log_success_msg "Configured Spark for mode: $MODE "
-    start
+    test "$RUNNING" && { start; return $?; }
+    return 0
 }
 
 
