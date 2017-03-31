@@ -13,7 +13,8 @@ vagrant_command = ARGV[0]
 
 # The version of Spark we will download & install
 spark_version = '2.1.0'
-spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
+spark_name = 'spark-' + spark_version + '-bin-custom'
+#spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
 # The place where Spark will be deployed inside the local machine
 # There is usually no need to change this
@@ -44,7 +45,7 @@ Vagrant.configure(2) do |config|
   # This is to help later when packaging: don't change the insecure key
   config.ssh.insert_key = false
 
-  config.vm.define "vgr-tid-spark-base64-7" do |vgrspark|
+  config.vm.define "vgr-spark-base64-7" do |vgrspark|
     
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
@@ -71,7 +72,7 @@ Vagrant.configure(2) do |config|
     #auto_mount: false
   
     # Customize the virtual machine: hostname & RAM
-    vgrspark.vm.hostname = "vgr-tid-spark-base64"
+    vgrspark.vm.hostname = "vgr-spark-base64"
     vgrspark.vm.provider :virtualbox do |vb|
       # Set the hostname in the provider
       vb.name = vgrspark.vm.hostname.to_s
@@ -120,21 +121,21 @@ Vagrant.configure(2) do |config|
     # (inc. development environments we need to install some Python packages)
     vgrspark.vm.provision "01.base",
     type: "shell",
-    privileged: false,
+    privileged: true,
     inline: <<-SHELL
-     sudo yum -y install epel-release
+     yum -y install epel-release
      # Make some subdirectories in the vagrant home dir
-     mkdir bin install tmp
+     sudo -u vagrant -i mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
-     sudo yum -y install redhat-lsb-core
-     sudo yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
-     sudo yum -y install openblas-devel
-     sudo yum -y install python-virtualenv
+     yum -y install redhat-lsb-core
+     yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
+     yum -y install openblas-devel
+     yum -y install python-virtualenv
      # General utility programs
-     sudo yum -y install man nc emacs-nox nano
+     yum -y install man nc emacs-nox nano
      # Other
      (cd /etc/yum.repos.d; wget http://www.graphviz.org/graphviz-rhel.repo)
-     sudo yum -y install graphviz
+     yum --enablerepo=graphviz-snapshot -y install graphviz
     SHELL
 
     # .........................................
@@ -177,13 +178,15 @@ Vagrant.configure(2) do |config|
      Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
      #Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      echo "Installing sparklyr"
-     Rscript -e 'install.packages( "sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     # As of March 2017, we need to install from git to have support for 2.1
+     #Rscript -e 'install.packages( "sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     Rscript -e 'devtools::install_github("rstudio/sparklyr")'
      yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
     SHELL
 
 
     # .........................................
-    # Install Python 2.7 by using the Sofware Collections (SCL)
+    # Install Python 2.7 by using the Software Collections (SCL)
 #    vgrspark.vm.provision "10.py27.scl", 
 #    type: "shell", 
 #    inline: <<-SHELL
@@ -209,9 +212,8 @@ Vagrant.configure(2) do |config|
      virtualenv /opt/ipnb --no-site-packages
 
      cd $HOME/bin
-     rm python python2.7 pip
+     rm -f python python2.7 pip
      ln -s /opt/ipnb/bin/{python,python2.7,pip} .
-
    SHELL
 
 
@@ -277,7 +279,9 @@ Vagrant.configure(2) do |config|
 
 
     # .........................................
-    # Install Spark
+    # Install a pre-built Spark
+    # We can either install a version we download from a Spark website mirror, or
+    # a locally built custom version
     vgrspark.vm.provision "30.spark",
     type: "shell",
     privileged: false,
@@ -286,11 +290,16 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
 
       # download & install Spark
-      cd install
-      echo "Downloading $2.tgz"
-      wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
       sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'; cd $3; rm -f current; ln -s $2/ current"
-      tar zxvf "$2.tgz" -C "$3"
+      case $2 in
+        *custom) 
+           file="/vagrant/spark/$2.tgz";;
+        *) echo "Downloading $2.tgz"
+           cd install
+           wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
+           file=$2.tgz;;
+      esac
+      tar zxvf "$file" -C "$3"
       sudo sh -c "echo 'PATH=\\$PATH:$3/current/bin' > /etc/profile.d/spark-path.sh"
 
       # Create the directory to place Hadoop config
@@ -313,7 +322,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # No Spark add-ons installed
-    #  * spark-csv is now part of Spark 2.0
+    #  * spark-csv is now part of Spark 2.x
     #  * GraphFrames & Kafka Streaming can be declared as packages in
     #    Spark config and they will be automatically downloaded
 
@@ -352,18 +361,27 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install the Toree Scala/Spark kernel
+    # We use a custom-built version compiled from master, to make sure that
+    # PR100 (https://github.com/apache/incubator-toree/pull/100), which fixes
+    # syntax highlighting, is included
     vgrspark.vm.provision "36.scala-kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
     args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
-      # Install the (Scala) Spark kernel
-      #pip install toree
-      cd $HOME/install
       PKG=toree-0.2.0.dev1.tar.gz
+      echo "Installing the (Scala) Spark kernel $PKG"
+      # -- From PyPi
+      #pip install toree
+      # -- From the developer snapshot
+      #pip install https://dist.apache.org/repos/dist/dev/incubator/toree/0.2.0/snapshots/dev1/toree-pip/$PKG
+      # -- From a local repository
+      #cd $HOME/install
       #wget --no-verbose "${4}spark-kernel/$1/$PKG"
-      pip install /vagrant/$PKG 
+      #pip install $PKG
+      # -- From a locally available file
+      pip install /vagrant/toree/$PKG 
     SHELL
 
 
@@ -432,10 +450,12 @@ Vagrant.configure(2) do |config|
       type: "shell",
       privileged: true,
       inline: <<-SHELL
+        echo "Cleaning temporal & installation files"
+        HH=/home/vagrant
+        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/*
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
-        rm -rf /home/vagrant/.cache/pip /home/vagrant/.bash_history /home/vagrant/install/*
         rm -rf /tmp/Rtmp* /var/tmp/yum*
-        sudo yum clean all
+        yum clean all
       SHELL
     end
 
