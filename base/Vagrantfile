@@ -242,6 +242,8 @@ Vagrant.configure(2) do |config|
       ./pip install tables
 
       ./pip install pandas
+      ./pip install bottleneck
+      ./pip install numexpr
       ./pip install statsmodels
       ./pip install scikit-learn
       ./pip install gensim
@@ -456,6 +458,38 @@ Vagrant.configure(2) do |config|
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
         rm -rf /tmp/Rtmp* /var/tmp/yum*
         yum clean all
+
+        # Remove bash history for root
+        unset HISTFILE
+        rm -f /root/.bash_history
+
+        # Cleanup log files
+        echo "Removing logfiles"
+        find /var/log -type f | while read f; do echo -ne '' > $f; done;
+
+        # Remove all temporal files
+        rm -rf /tmp/*
+
+        # Zero free space
+        echo "Whiteout root & boot partitions"
+        for fs in / /boot/
+        do
+           count=$(df --sync -kP / | tail -n1  | awk -F ' ' '{print $4}') 
+           let count--
+           dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
+           rm ${fs}whitespace;
+        done
+        sync
+
+        # Zero the swap space
+        swappart=$(cat /proc/swaps | tail -n1 | awk -F ' ' '{print $1}')
+        if [ "$swappart" != "" ]; then
+          swapoff $swappart;
+          dd if=/dev/zero of=$swappart;
+          mkswap $swappart;
+          swapon $swappart;
+        fi
+
       SHELL
     end
 
