@@ -9,5 +9,10 @@ unset HADOOP_CONF_DIR
 # Set the Python to use for executors
 PYSPARK_PYTHON=/opt/ipnb/bin/python2.7
 
+# This enables netlib-java to use the optimized BLAS libraries
+# For this to work, the Spark distribution needs to contain the native reference
+# implementation (which binary pre-built packages do not usually include)
+LD_PRELOAD=/usr/lib64/libopenblas.so
+
 # Default arguments for job submission
 PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 --executor-cores 2 --executor-memory 1g'

@@ -1,3 +1,18 @@
+v. 1.9.7
+ * Improved cleanup for box size reduction
+ 
+v. 1.9.6
+ * Spark is 2.1.0
+ * based on CentOS 7.3
+ * IPython 5.3.0
+ * R 3.3.2
+ * use OpenJDK 8 instead of Oracle Java
+ * no Theano/Keras installation (left to child boxes),
+ * fixes in manager script
+ * custom build of Spark, including native BLAS bindings
+ * sparklyr installed from github
+ * custom Toree build
+ 
 v. 1.9.3
  * Spark is 2.0.2
  * added sparklyr
