@@ -1,10 +1,12 @@
-#!/bin/sh
+#!/bin/bash
 # Wrapper script to execute a Python Notebook kernel with Spark
 
 # Put command line arguments in env so they are received by the Python kernel
+# [This one works in bash, but not in dash]
 export PYSPARK_DRIVER_PYTHON_OPTS="$@"
+
 # Set the Python to use for the driver, when inside a notebook
 export PYSPARK_DRIVER_PYTHON=/opt/ipnb/bin/python2.7
 
 # Start Pyspark with no arguments -- it will fetch its options from spark config
-/opt/spark/current/bin/pyspark
+exec /opt/spark/current/bin/pyspark

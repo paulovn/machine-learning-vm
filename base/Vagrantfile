@@ -30,8 +30,10 @@ repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buil
 vagrant_command = ARGV[0]
 
 # Conditionally activate some provision sections
-provision_run_ai  = ENV['PROVISION_AI'] == '1' || \
-        (vagrant_command == 'provision' && ARGV.include?('60.ai'))
+provision_run_tf  = ENV['PROVISION_TF'] == '1' || \
+        (vagrant_command == 'provision' && ARGV.include?('60.tf'))
+provision_run_dl = (ENV['PROVISION_DL'] == '1') || \
+        (vagrant_command == 'provision' && ARGV.include?('61.dl'))
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('70.clean'))
 
@@ -44,16 +46,21 @@ Vagrant.configure(2) do |config|
 
   # This is to help later when packaging: don't change the insecure key
   config.ssh.insert_key = false
-
-  config.vm.define "vgr-spark-base64-7" do |vgrspark|
-    
+  #config.ssh.insert_key = true
+  #config.ssh.forward_agent = true
+  #config.ssh.username = "ubuntu"
+  
+  config.vm.define "vgr-spark-base32" do |vgrspark|
+     
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
     # https://docs.vagrantup.com.
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vgrspark.vm.box = "bento/centos-7.3"
+    #vgrspark.vm.box = "bento/centos-7.3"
+    #vgrspark.vm.box = "ubuntu/xenial32"
+    vgrspark.vm.box = "bento/ubuntu-16.04-i386"
     #vgrspark.vm.box_version = "2.2.9"
     # v. 2.3.0 has a regression problem with some VirtualBox versions
     # see https://github.com/chef/bento/issues/688
@@ -72,7 +79,7 @@ Vagrant.configure(2) do |config|
     #auto_mount: false
   
     # Customize the virtual machine: hostname & RAM
-    vgrspark.vm.hostname = "vgr-spark-base64"
+    vgrspark.vm.hostname = "vgr-spark-base32"
     vgrspark.vm.provider :virtualbox do |vb|
       # Set the hostname in the provider
       vb.name = vgrspark.vm.hostname.to_s
@@ -117,32 +124,39 @@ Vagrant.configure(2) do |config|
 
     # ---------------------------------------------------------------------
 
+    # https://github.com/mitchellh/vagrant/issues/1673
+    vgrspark.vm.provision "00.fix-tty",
+    type: "shell",
+    privileged: true,
+    inline: "sed -i '/tty/!s/mesg n/tty -s \\&\\& mesg n/' /root/.profile"
+     
     # Install some base CentOS software
     # (inc. development environments we need to install some Python packages)
     vgrspark.vm.provision "01.base",
     type: "shell",
     privileged: true,
     inline: <<-SHELL
-     yum -y install epel-release
+     apt-get update -y
      # Make some subdirectories in the vagrant home dir
      sudo -u vagrant -i mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
-     yum -y install redhat-lsb-core
-     yum -y install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
-     yum -y install openblas-devel
-     yum -y install python-virtualenv
+     #XXXapt install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
+     #XXXapt install libopenblas-dev
      # General utility programs
-     yum -y install man nc emacs-nox nano
+     apt-get install -y emacs-nox virtualenv
      # Other
-     (cd /etc/yum.repos.d; wget http://www.graphviz.org/graphviz-rhel.repo)
-     yum --enablerepo=graphviz-snapshot -y install graphviz
+     #XXX(cd /etc/yum.repos.d; wget http://www.graphviz.org/graphviz-rhel.repo)
+     apt-get install -y graphviz
+     # customize locales
+     #locale-gen "es_ES.UTF-8" "es_AR.UTF-8" "es_CL.UTF-8" "pt_BR.UTF-8" "de_DE.UTF-8"
+     # dpkg-reconfigure locales
     SHELL
 
     # .........................................
-    # We install now OpenJDK 8 instead of Oracle 8
     vgrspark.vm.provision "02.jdk",
     type: "shell", 
-    inline: "sudo yum -y install java-1.8.0-openjdk-devel"
+    privileged: true, 
+    inline: "apt-get install -y openjdk-8-jdk-headless"
    # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
 
     # Install R from EPEL
@@ -150,11 +164,10 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
-     yum -y install epel-release
-     # The plain R metapackage would install also R-java-devel, which depends
-     # on "java-devel", and thus installs openjdk 7 (since OpenJDK 8 does not
-     # provide "java-devel")
-     yum -y install R-core R-core-devel
+     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
+     add-apt-repository -u "deb http://cran.es.r-project.org/bin/linux/ubuntu xenial/"
+     apt-get install -y r-recommended
+     #(r-base-dev)
     SHELL
 
     # Install some R packages & the IR kernel for Jupyter
@@ -162,28 +175,31 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
-     mkdir -p /usr/local/lib/R/library
+     RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
+     mkdir -p $RDIR
      echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
-     yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel cairo-devel libssh2-devel
-     for pkg in '"rmarkdown","magrittr"' \
-                '"dplyr","tidyr"' \
-                '"data.table","ggplot2"' \
-                '"caret"'
+     apt-get install -y libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev
+     #yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel cairo-devel libssh2-devel
+     for pkg in "'rmarkdown','magrittr'" \
+                "'dplyr','tidyr'" \
+                "'data.table','ggplot2'" \
+                "'caret'"
      do
          echo -e "\nInstalling R packages: $pkg"
          Rscript -e "install.packages(c($pkg),dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
      done
+
      echo "Installing IRkernel"
-     Rscript -e 'install.packages( c("crayon","pbdZMQ","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     Rscript -e 'install.packages( c("crayon","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
-     #Rscript -e 'install.packages( c("rzmq","repr","IRkernel","IRdisplay"),repos=c("http://irkernel.github.io/","http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+
      echo "Installing sparklyr"
      # As of March 2017, we need to install from git to have support for 2.1
-     #Rscript -e 'install.packages( "sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      Rscript -e 'devtools::install_github("rstudio/sparklyr")'
-     yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
-    SHELL
 
+     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev
+     #yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
+    SHELL
 
     # .........................................
     # Install Python 2.7 by using the Software Collections (SCL)
@@ -225,7 +241,8 @@ Vagrant.configure(2) do |config|
     keep_color: true,
     privileged: false, 
     inline: <<-SHELL
-      sudo yum -y install openblas-devel hdf5-devel
+      sudo apt-get install -y libpython2.7-dev libopenblas-dev libhdf5-dev libfreetype6-dev
+      #yum -y install openblas-devel hdf5-devel
 
       cd /opt/ipnb/bin
       ./pip install --upgrade pip
@@ -237,6 +254,7 @@ Vagrant.configure(2) do |config|
       ./pip install matplotlib
       ./pip install ipython
       ./pip install jupyter     
+      ./pip install notebook
 
       ./pip install h5py
       ./pip install tables
@@ -259,7 +277,8 @@ Vagrant.configure(2) do |config|
       ./pip install openpyxl
 
       # We don't need this anymore
-      sudo yum -y erase hdf5-devel
+      sudo apt-get remove -y libopenblas-dev libhdf5-dev libfreetype6-dev
+      #sudo yum -y erase hdf5-devel
 
     SHELL
 
@@ -275,8 +294,8 @@ Vagrant.configure(2) do |config|
       cd install
       VERSION=2.11.8
       echo "Downloading Scala $VERSION"
-      wget --no-verbose http://downloads.lightbend.com/scala/$VERSION/scala-$VERSION.rpm
-      sudo yum -y install scala-$VERSION.rpm
+      wget --no-verbose http://downloads.lightbend.com/scala/$VERSION/scala-$VERSION.deb
+      sudo dpkg -i scala-$VERSION.deb
     SHELL
 
 
@@ -314,11 +333,11 @@ Vagrant.configure(2) do |config|
         test -d $d/ipnb || sudo mkdir -m 1777 $d/ipnb
       done
 
-      # Add to the R library a link to the installed SparkR package
-      DIR=/usr/local/lib/R/library
-      if [ -d $DIR ]; then
-         sudo rm -f "$DIR/SparkR"
-         sudo ln -s "$3/$2/R/lib/SparkR/" "$DIR"
+      # Add to the R library directory a link to the installed SparkR package
+      RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
+      if [ -d $RDIR ]; then
+         sudo rm -f "$RDIR/SparkR"
+         sudo ln -s "$3/$2/R/lib/SparkR/" "$RDIR"
       fi
     SHELL
 
@@ -337,26 +356,26 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vgrspark.vm.provision "33.notebook-script", 
+    vgrspark.vm.provision "33.notebook.script", 
     type: "file",
     source: "buildfiles/jupyter-notebook-mgr",
     destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
 
     # .........................................
     # Install the Systemd unit file to manage the notebook server
-    vgrspark.vm.provision "34a.notebook-systemd",
+    vgrspark.vm.provision "34a.notebook.systemd",
     type: "file",
     source: "buildfiles/notebook.service",
     destination: "/tmp/notebook.service"
 
-    vgrspark.vm.provision "34b.notebook-systemd",
+    vgrspark.vm.provision "34b.notebook.systemd",
     type: "shell",
     privileged: true,
     inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
 
     # .........................................
     # Install the Pyspark script wrapper
-    vgrspark.vm.provision "35.pyspark-wrapper",
+    vgrspark.vm.provision "35.pyspark.wrapper",
     type: "file",
     source: "buildfiles/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
@@ -366,7 +385,7 @@ Vagrant.configure(2) do |config|
     # We use a custom-built version compiled from master, to make sure that
     # PR100 (https://github.com/apache/incubator-toree/pull/100), which fixes
     # syntax highlighting, is included
-    vgrspark.vm.provision "36.scala-kernel",
+    vgrspark.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -391,26 +410,26 @@ Vagrant.configure(2) do |config|
     # Install some files for notebooks
 
     # a custom css
-    vgrspark.vm.provision "40.notebook-css",
+    vgrspark.vm.provision "40.notebook.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
 
-    # a slightly modified Jupyter icon
-    # (so that it's easier to identify browser tabs belonging to the VM)
-    vgrspark.vm.provision "41.jupyter-icon",
-    type: "file",
-    source: 'buildfiles/style/jupyter-favicon-custom.ico',
-    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
-
     # the notebook extensions
-    vgrspark.vm.provision "42.notebook-ext",
+    vgrspark.vm.provision "41.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: '/opt/ipnb/share/jupyter'
 
+    # a slightly modified Jupyter icon
+    # (so that it's easier to identify browser tabs belonging to the VM)
+    vgrspark.vm.provision "42.icon.jupyter",
+    type: "file",
+    source: 'buildfiles/style/jupyter-favicon-custom.ico',
+    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
+
     # icons for Pyspark & Scala kernels
-    vgrspark.vm.provision "43.kernel-icons",
+    vgrspark.vm.provision "43.icon.kernel",
     type: "file", 
     source: 'buildfiles/style/kernel-icons',
     destination: spark_basedir
@@ -428,24 +447,46 @@ Vagrant.configure(2) do |config|
     privileged: true,
     inline: 'cp -p /tmp/theanorc /etc/theanorc'
 
-    # .........................................
-    # Install the additional packages for the AI course
-    # Do it only if the environment variable PROVISION_AI has a 1 value
-    if (provision_run_ai)
-      vgrspark.vm.provision "60.ai",
-        type: "shell",
-        keep_color: true,
-        inline: <<-SHELL
-          echo "Installing AI packages"
-          sudo yum -y install python27-tkinter
-          cd /opt/ipnb/bin
-          ./pip install nltk
-          ./pip install sparqlkernel
-          ./pip install aimlbotkernel
-          ./pip install quiver
-        SHELL
+    
+    if (provision_run_tf)
+     # http://stackoverflow.com/questions/33634525/tensorflow-on-32-bit-linux
+     vgrspark.vm.provision "60.tf",
+     type: 'shell',
+     privileged: false,
+     inline: <<-SHELL
+       mkdir bazel
+       cd bazel
+       wget https://github.com/bazelbuild/bazel/releases/download/0.4.5/bazel-0.4.5-dist.zip
+       unzip bazel-0.4.5-dist.zip
+       patch < /vagrant/tensorflow/bazel.diff
+       ./compile.sh
+       ln -s output/bazel $HOME/bin
+       wget https://github.com/tensorflow/tensorflow/archive/v1.0.1.tar.gz
+       tar zxvf v1.0.1.tar.gz 
+       cd tensorflow-1.0.1/
+       grep -Rl "lib64"| xargs sed -i 's/lib64/lib/g'
+       # --- there are missing options here ----
+       PYTHON_BIN_PATH=/opt/ipnb/bin/python CC_OPT_FLAGS='-march=native' ./configure
+       bazel build -c opt --jobs 1 --local_resources 1024,1.0,2.0 --verbose_failures //tensorflow/tools/pip_package:build_pip_package
+       bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
+       cp -p /tmp/tensorflow_pkg/tensorflow-1.0.1-cp27-cp27mu-linux_i686.whl
+      SHELL
     end
 
+    if (provision_run_dl)
+      vgrspark.vm.provision "61.dl",
+      type: "shell",
+      privileged: false,
+      keep_color: true,
+      inline: <<-SHELL
+         sudo apt-get install -y libopenblas-dev
+         pip install --upgrade /vagrant/tensorflow/tensorflow-1.0.1*.whl
+         pip install --upgrade --no-deps git+git://github.com/Theano/Theano.git
+         pip install --upgrade keras quiver
+       SHELL
+    end
+
+    
     # Clean
     if (provision_run_clean)
       vgrspark.vm.provision "70.clean",
@@ -457,7 +498,9 @@ Vagrant.configure(2) do |config|
         rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/*
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
         rm -rf /tmp/Rtmp* /var/tmp/yum*
-        yum clean all
+        apt-get autoclean -y
+        apt-get clean -y 
+        apt-get autoremove -y
 
         # Remove bash history for root
         unset HISTFILE

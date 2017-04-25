@@ -20,7 +20,11 @@
 . /lib/lsb/init-functions
 
 # Slurp the Spark notebook configuration
-CFGNAME=/etc/sysconfig/jupyter-notebook
+if test -d /etc/sysconfig/jupyter-notebook; then
+    CFGNAME=/etc/sysconfig/jupyter-notebook
+else
+    CFGNAME=/etc/jupyter/jupyter-notebook
+fi
 set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
