@@ -32,6 +32,9 @@ NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
 NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}
 export LOGDIR=${LOGDIR:-/var/log/ipnb}
 
+id ${NOTEBOOK_USER} 2>/dev/null || { echo "Error: user $NOTEBOOK_USER does not exist"; exit 1; }
+test -f ${NOTEBOOK_SCRIPT} || { echo "Error: can't find script $NOTEBOOK_SCRIPT"; exit 1; }
+
 DESC="Jupyter Notebook"
 DAEMON="jupyter-notebook"
 VARDIR="/var/run/ipnb"

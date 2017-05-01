@@ -7,9 +7,13 @@
 
 vagrant_command = ARGV[0]
 
+# Python version for which we will be creating the notebook environment (2 or 3)
+python_version = '3'
+
+python_version_full = python_version == '3' ? '3.5' : '2.7'
+
 # --------------------------------------------------------------------------
 # Variables defining the installation of Spark
-
 
 # The version of Spark we will download & install
 spark_version = '2.1.0'
@@ -20,7 +24,7 @@ spark_name = 'spark-' + spark_version + '-bin-custom'
 # There is usually no need to change this
 spark_basedir = '/opt/spark'
 
-# The artifact repository where some custom-built files are kept
+# An artifact repository where some custom-built files may be kept
 repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
 
 # --------------------------------------------------------------------------
@@ -36,7 +40,6 @@ provision_run_dl = (ENV['PROVISION_DL'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('61.dl'))
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('70.clean'))
-
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -216,35 +219,38 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Create a Python 2.7 virtualenv and install wrappers to point there
-    vgrspark.vm.provision "11.py27.venv",
+    vgrspark.vm.provision "11.python.venv",
     type: "shell", 
     privileged: false,
+    args: [ python_version, python_version_full ],
     inline: <<-SHELL
-     sudo rm -rf /opt/ipnb
-     sudo mkdir -m 775 /opt/ipnb
-     sudo chown vagrant.vagrant /opt/ipnb
+     sudo rm -rf /opt/ipnb$1
+     sudo mkdir -m 775 /opt/ipnb$1
+     sudo chown vagrant.vagrant /opt/ipnb$1
+     sudo ln -s /opt/ipnb$1 /opt/ipnb
 
      # Create a virtualenv
-     virtualenv /opt/ipnb --no-site-packages
+     virtualenv -p python$1 /opt/ipnb$1 --no-site-packages
 
      cd $HOME/bin
-     rm -f python python2.7 pip
-     ln -s /opt/ipnb/bin/{python,python2.7,pip} .
+     rm -f python python$1 pip
+     ln -s /opt/ipnb$1/bin/{python,python$2,pip} .
    SHELL
 
 
     # .........................................
     # In the virtualenv, install the Python packages to use in the Notebooks
     # Plus a few ML-related more
-    vgrspark.vm.provision "14.py27.pkg",
+    vgrspark.vm.provision "14.python.pkg",
     type: "shell", 
     keep_color: true,
     privileged: false, 
+    args: [ python_version, python_version_full ],
     inline: <<-SHELL
-      sudo apt-get install -y libpython2.7-dev libopenblas-dev libhdf5-dev libfreetype6-dev
+      sudo apt-get install -y libpython${2}-dev libopenblas-dev libhdf5-dev libfreetype6-dev
       #yum -y install openblas-devel hdf5-devel
 
-      cd /opt/ipnb/bin
+      cd /opt/ipnb$1/bin
       ./pip install --upgrade pip
       ./pip install --upgrade setuptools
       # we install this is to avoid InsecurePlatformWarning messages
@@ -277,7 +283,7 @@ Vagrant.configure(2) do |config|
       ./pip install openpyxl
 
       # We don't need this anymore
-      sudo apt-get remove -y libopenblas-dev libhdf5-dev libfreetype6-dev
+      sudo apt-get remove -y libhdf5-dev libfreetype6-dev
       #sudo yum -y erase hdf5-devel
 
     SHELL
@@ -413,20 +419,20 @@ Vagrant.configure(2) do |config|
     vgrspark.vm.provision "40.notebook.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
-    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/custom/custom.css"
+    destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
 
     # the notebook extensions
     vgrspark.vm.provision "41.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
-    destination: '/opt/ipnb/share/jupyter'
+    destination: "/opt/ipnb#{python_version}/share/jupyter"
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
     vgrspark.vm.provision "42.icon.jupyter",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
-    destination: "/opt/ipnb/lib/python2.7/site-packages/notebook/static/base/images/favicon-custom.ico"
+    destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
 
     # icons for Pyspark & Scala kernels
     vgrspark.vm.provision "43.icon.kernel",
@@ -453,23 +459,23 @@ Vagrant.configure(2) do |config|
      vgrspark.vm.provision "60.tf",
      type: 'shell',
      privileged: false,
+     args: [ python_version ],
      inline: <<-SHELL
        mkdir bazel
        cd bazel
        wget https://github.com/bazelbuild/bazel/releases/download/0.4.5/bazel-0.4.5-dist.zip
        unzip bazel-0.4.5-dist.zip
-       patch < /vagrant/tensorflow/bazel.diff
+       patch < /vagrant/tensorflow/bazel-32bit.diff
        ./compile.sh
-       ln -s output/bazel $HOME/bin
+       ln -s $PWD/output/bazel $HOME/bin
        wget https://github.com/tensorflow/tensorflow/archive/v1.0.1.tar.gz
        tar zxvf v1.0.1.tar.gz 
        cd tensorflow-1.0.1/
        grep -Rl "lib64"| xargs sed -i 's/lib64/lib/g'
-       # --- there are missing options here ----
-       PYTHON_BIN_PATH=/opt/ipnb/bin/python CC_OPT_FLAGS='-march=native' ./configure
+       PYTHON_BIN_PATH=/opt/ipnb$1/bin/python CC_OPT_FLAGS='-march=native' TF_NEED_JEMALLOC=1 TF_NEED_GCP=0 TF_NEED_HDFS=0 TF_ENABLE_XLA=0 TF_NEED_OPENCL=0 TF_NEED_CUDA=0 USE_DEFAULT_PYTHON_LIB_PATH=1 ./configure
        bazel build -c opt --jobs 1 --local_resources 1024,1.0,2.0 --verbose_failures //tensorflow/tools/pip_package:build_pip_package
        bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
-       cp -p /tmp/tensorflow_pkg/tensorflow-1.0.1-cp27-cp27mu-linux_i686.whl
+       cp -p /tmp/tensorflow_pkg/tensorflow-1.0.1-cp*-cp*-linux_i686.whl /vagrant/tensorflow
       SHELL
     end
 
@@ -478,9 +484,9 @@ Vagrant.configure(2) do |config|
       type: "shell",
       privileged: false,
       keep_color: true,
+      args: [ python_version ],
       inline: <<-SHELL
-         sudo apt-get install -y libopenblas-dev
-         pip install --upgrade /vagrant/tensorflow/tensorflow-1.0.1*.whl
+         pip install --upgrade /vagrant/tensorflow/tensorflow-1.0.1-cp$1*.whl
          pip install --upgrade --no-deps git+git://github.com/Theano/Theano.git
          pip install --upgrade keras quiver
        SHELL
