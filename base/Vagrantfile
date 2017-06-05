@@ -133,7 +133,7 @@ Vagrant.configure(2) do |config|
     privileged: true,
     inline: "sed -i '/tty/!s/mesg n/tty -s \\&\\& mesg n/' /root/.profile"
      
-    # Install some base CentOS software
+    # Install some base software
     # (inc. development environments we need to install some Python packages)
     vgrspark.vm.provision "01.base",
     type: "shell",
@@ -229,13 +229,15 @@ Vagrant.configure(2) do |config|
      sudo chown vagrant.vagrant /opt/ipnb$1
      sudo ln -s /opt/ipnb$1 /opt/ipnb
 
+     sudo apt-get install -y libpython${2}-dev
+
      # Create a virtualenv
      virtualenv -p python$1 /opt/ipnb$1 --no-site-packages
 
      cd $HOME/bin
      rm -f python python$1 pip
      ln -s /opt/ipnb$1/bin/{python,python$2,pip} .
-   SHELL
+    SHELL
 
 
     # .........................................
@@ -245,12 +247,11 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     keep_color: true,
     privileged: false, 
-    args: [ python_version, python_version_full ],
     inline: <<-SHELL
-      sudo apt-get install -y libpython${2}-dev libopenblas-dev libhdf5-dev libfreetype6-dev
+      sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev
       #yum -y install openblas-devel hdf5-devel
 
-      cd /opt/ipnb$1/bin
+      cd /opt/ipnb/bin
       ./pip install --upgrade pip
       ./pip install --upgrade setuptools
       # we install this is to avoid InsecurePlatformWarning messages
@@ -261,6 +262,7 @@ Vagrant.configure(2) do |config|
       ./pip install ipython
       ./pip install jupyter     
       ./pip install notebook
+      ./pip install ipywidgets
 
       ./pip install h5py
       ./pip install tables
@@ -285,6 +287,61 @@ Vagrant.configure(2) do |config|
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype6-dev
       #sudo yum -y erase hdf5-devel
+
+      # Enable ipywidgets
+      ./jupyter nbextension enable --py widgetsnbextension --sys-prefix
+    SHELL
+
+    vgrspark.vm.provision "15.pylucene",
+    type: "shell",
+    keep_color: true,
+    privileged: false,
+    inline: <<-SHELL
+    VENV=/opt/ipnb/bin
+
+    mkdir -p Soft
+    cd Soft
+    PKG=pylucene-6.5.0
+    PKGFILE=$PKG-src.tar.gz
+    wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
+    tar zxvf $PKGFILE
+    cd $PKG
+ 
+    # Build JCC
+    export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
+    # http://mail-archives.apache.org/mod_mbox/lucene-pylucene-dev/201704.mbox/browser
+    patch -p0 <<EOF
+--- jcc/setup.p.old	2017-05-18 11:08:48.644087400 +0200
++++ jcc/setup.py	2017-05-18 11:31:22.307551100 +0200
+@@ -360,8 +360,8 @@
+                           '-current_version', jcc_ver,
+                           '-compatibility_version', jcc_ver]
+         elif platform == 'linux':
+-            kwds["extra_link_args"] = \
+-                lflags + ['-lpython%s.%s' %(sys.version_info[0:2])]
++            #kwds["extra_link_args"] = \
++            #    lflags + ['-lpython%s.%s' %(sys.version_info[0:2])]
+             kwds["force_shared"] = True    # requires jcc/patches/patch.43
+         elif platform in IMPLIB_LFLAGS:
+             jcclib = 'jcc%s%s.lib' %(py_version_suffix, debug and '_d' or '')
+EOF
+    cd jcc
+    $VENV/bin/python setup.py build
+    $VENV/bin/python setup.py install
+    cd ..
+
+    # build pylucene
+    sudo apt-get install -y ant
+    export PREFIX_PYTHON=$VENV
+    export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
+    export PYTHON="$PREFIX_PYTHON/bin/python3"
+    export "JCC=$PYTHON -m jcc --shared"
+    export NUM_FILES=8
+    make
+    make bdist
+
+    # install
+    $VENV/bin/easy_install dist/*.egg
 
     SHELL
 
