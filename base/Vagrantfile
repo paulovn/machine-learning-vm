@@ -34,12 +34,12 @@ repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buil
 vagrant_command = ARGV[0]
 
 # Conditionally activate some provision sections
-provision_run_tf  = ENV['PROVISION_TF'] == '1' || \
-        (vagrant_command == 'provision' && ARGV.include?('60.tf'))
 provision_run_dl = (ENV['PROVISION_DL'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('61.dl'))
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('70.clean'))
+
+provision_run_dl = true
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -49,11 +49,10 @@ Vagrant.configure(2) do |config|
 
   # This is to help later when packaging: don't change the insecure key
   config.ssh.insert_key = false
-  #config.ssh.insert_key = true
   #config.ssh.forward_agent = true
   #config.ssh.username = "ubuntu"
   
-  config.vm.define "vgr-spark-base32" do |vgrspark|
+  config.vm.define "vm-spark-base64" do |vmconf|
      
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
@@ -61,31 +60,26 @@ Vagrant.configure(2) do |config|
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    #vgrspark.vm.box = "bento/centos-7.3"
-    #vgrspark.vm.box = "ubuntu/xenial32"
-    vgrspark.vm.box = "bento/ubuntu-16.04-i386"
-    #vgrspark.vm.box_version = "2.2.9"
-    # v. 2.3.0 has a regression problem with some VirtualBox versions
-    # see https://github.com/chef/bento/issues/688
-    # A workaround is included below
+    vmconf.vm.box = "bento/ubuntu-16.04"
+    #vmconf.vm.box_version = "2.2.9"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
     # `vagrant box outdated`. This is not recommended.
-    # vgrspark.vm.box_check_update = false
+    # vmconf.vm.box_check_update = false
 
     # Put into the usual synced folder a subdirectory
-    vgrspark.vm.synced_folder ".", "/vagrant", disabled: true
-    vgrspark.vm.synced_folder "vmfiles", "/vagrant", 
+    vmconf.vm.synced_folder ".", "/vagrant", disabled: true
+    vmconf.vm.synced_folder "vmfiles", "/vagrant",
     disabled: false
     # owner: spark_username
     #auto_mount: false
   
     # Customize the virtual machine: hostname & RAM
-    vgrspark.vm.hostname = "vgr-spark-base32"
-    vgrspark.vm.provider :virtualbox do |vb|
+    vmconf.vm.hostname = "vgr-spark-base64"
+    vmconf.vm.provider :virtualbox do |vb|
       # Set the hostname in the provider
-      vb.name = vgrspark.vm.hostname.to_s
+      vb.name = vmconf.vm.hostname.to_s
       # Customize the amount of memory on the VM
       vb.memory = "1024"
       # Display the VirtualBox GUI when booting the machine
@@ -97,13 +91,13 @@ Vagrant.configure(2) do |config|
 
     # Networking
     # Declare a public network
-    #vgrspark.vm.network "public_network", type: "dhcp", bridge: 'Realtek PCIe GBE Family Controller', :mac => "08002710A7ED"
+    #vmconf.vm.network "public_network", type: "dhcp", bridge: 'Realtek PCIe GBE Family Controller', :mac => "08002710A7ED"
 
     # Create a forwarded port mapping which allows access to a specific port
     # within the machine from a port on the host machine. In the example below,
     # accessing "localhost:8080" will access port 80 on the guest machine.
-    #vgrspark.vm.network "forwarded_port", guest: port_ipython, host: port_ipython
-    #vgrspark.vm.network :forwarded_port, 
+    #vmconf.vm.network "forwarded_port", guest: port_ipython, host: port_ipython
+    #vmconf.vm.network :forwarded_port,
     #host: 4040, 
     #guest: 4040, 
     #auto_correct: true                 # Spark UI (Driver)
@@ -112,30 +106,30 @@ Vagrant.configure(2) do |config|
     # the path on the host to the actual folder. The second argument is
     # the path on the guest to mount the folder. And the optional third
     # argument is a set of non-required options.
-    # vgrspark.vm.synced_folder "../data", "/vagrant_data"
+    # vmconf.vm.synced_folder "../data", "/vagrant_data"
 
     # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
     # such as FTP and Heroku are also available. See the documentation at
     # https://docs.vagrantup.com/v2/push/atlas.html for more information.
-    # vgrspark.push.define "atlas" do |push|
+    # vmconf.push.define "atlas" do |push|
     #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
     # end
     # Push to artifactory
     #curl -i -u<USERNAME>:<API_KEY> -T <PATH_TO_FILE> "http://artifactory.hi.inet:8081/artifactory/vagrant-machinelearning/{vagrantBoxName.box};box_name={name};box_provider={provider};box_version={version}"
 
-    vgrspark.vm.post_up_message = "**** The Vagrant Spark base machine is up"
+    vmconf.vm.post_up_message = "**** The Vagrant Spark base machine is up"
 
     # ---------------------------------------------------------------------
 
     # https://github.com/mitchellh/vagrant/issues/1673
-    vgrspark.vm.provision "00.fix-tty",
+    vmconf.vm.provision "00.fix-tty",
     type: "shell",
     privileged: true,
     inline: "sed -i '/tty/!s/mesg n/tty -s \\&\\& mesg n/' /root/.profile"
      
     # Install some base software
     # (inc. development environments we need to install some Python packages)
-    vgrspark.vm.provision "01.base",
+    vmconf.vm.provision "01.base",
     type: "shell",
     privileged: true,
     inline: <<-SHELL
@@ -156,14 +150,14 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # .........................................
-    vgrspark.vm.provision "02.jdk",
+    vmconf.vm.provision "02.jdk",
     type: "shell", 
     privileged: true, 
     inline: "apt-get install -y openjdk-8-jdk-headless"
    # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
 
     # Install R from EPEL
-    vgrspark.vm.provision "03.R", 
+    vmconf.vm.provision "03.R",
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
@@ -174,7 +168,7 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # Install some R packages & the IR kernel for Jupyter
-    vgrspark.vm.provision "04.Rpkg", 
+    vmconf.vm.provision "04.Rpkg",
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
@@ -204,22 +198,10 @@ Vagrant.configure(2) do |config|
      #yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
     SHELL
 
-    # .........................................
-    # Install Python 2.7 by using the Software Collections (SCL)
-#    vgrspark.vm.provision "10.py27.scl", 
-#    type: "shell", 
-#    inline: <<-SHELL
-#     sudo yum -y install centos-release-SCL centos-release-scl
-#     sudo yum -y install python27 python27-python-virtualenv
-#    SHELL
-
-    # In order to compile code that requires C++11 we need:
-    # sudo yum -y install devtoolset-3-gcc-c++ devtoolset-3-gcc-gfortran
-    # scl enable devtoolset-3 bash
 
     # .........................................
-    # Create a Python 2.7 virtualenv and install wrappers to point there
-    vgrspark.vm.provision "11.python.venv",
+    # Create a Python virtualenv and install wrappers to point there
+    vmconf.vm.provision "11.python.venv",
     type: "shell", 
     privileged: false,
     args: [ python_version, python_version_full ],
@@ -243,7 +225,7 @@ Vagrant.configure(2) do |config|
     # .........................................
     # In the virtualenv, install the Python packages to use in the Notebooks
     # Plus a few ML-related more
-    vgrspark.vm.provision "14.python.pkg",
+    vmconf.vm.provision "14.python.pkg",
     type: "shell", 
     keep_color: true,
     privileged: false, 
@@ -292,7 +274,7 @@ Vagrant.configure(2) do |config|
       ./jupyter nbextension enable --py widgetsnbextension --sys-prefix
     SHELL
 
-    vgrspark.vm.provision "15.pylucene",
+    vmconf.vm.provision "15.pylucene",
     type: "shell",
     keep_color: true,
     privileged: false,
@@ -347,7 +329,7 @@ EOF
 
     # .........................................
     # Install Scala
-    vgrspark.vm.provision "20.scala",
+    vmconf.vm.provision "20.scala",
     type: "shell", 
     privileged: false,
     keep_color: true,    
@@ -366,7 +348,7 @@ EOF
     # Install a pre-built Spark
     # We can either install a version we download from a Spark website mirror, or
     # a locally built custom version
-    vgrspark.vm.provision "30.spark",
+    vmconf.vm.provision "30.spark",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -412,33 +394,33 @@ EOF
 
     # .........................................
     # Install the Spark configuration files for the different modes
-    vgrspark.vm.provision "32.spark.cfg",
+    vmconf.vm.provision "32.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
     destination: '/opt/spark/current'
 
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vgrspark.vm.provision "33.notebook.script", 
+    vmconf.vm.provision "33.notebook.script",
     type: "file",
     source: "buildfiles/jupyter-notebook-mgr",
     destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
 
     # .........................................
     # Install the Systemd unit file to manage the notebook server
-    vgrspark.vm.provision "34a.notebook.systemd",
+    vmconf.vm.provision "34a.notebook.systemd",
     type: "file",
     source: "buildfiles/notebook.service",
     destination: "/tmp/notebook.service"
 
-    vgrspark.vm.provision "34b.notebook.systemd",
+    vmconf.vm.provision "34b.notebook.systemd",
     type: "shell",
     privileged: true,
     inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
 
     # .........................................
     # Install the Pyspark script wrapper
-    vgrspark.vm.provision "35.pyspark.wrapper",
+    vmconf.vm.provision "35.pyspark.wrapper",
     type: "file",
     source: "buildfiles/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
@@ -448,7 +430,7 @@ EOF
     # We use a custom-built version compiled from master, to make sure that
     # PR100 (https://github.com/apache/incubator-toree/pull/100), which fixes
     # syntax highlighting, is included
-    vgrspark.vm.provision "36.scala.kernel",
+    vmconf.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -473,26 +455,26 @@ EOF
     # Install some files for notebooks
 
     # a custom css
-    vgrspark.vm.provision "40.notebook.css",
+    vmconf.vm.provision "40.notebook.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
 
     # the notebook extensions
-    vgrspark.vm.provision "41.notebook.ext",
+    vmconf.vm.provision "41.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: "/opt/ipnb#{python_version}/share/jupyter"
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
-    vgrspark.vm.provision "42.icon.jupyter",
+    vmconf.vm.provision "42.icon.jupyter",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
 
     # icons for Pyspark & Scala kernels
-    vgrspark.vm.provision "43.icon.kernel",
+    vmconf.vm.provision "43.icon.kernel",
     type: "file", 
     source: 'buildfiles/style/kernel-icons',
     destination: spark_basedir
@@ -500,50 +482,24 @@ EOF
 
     # .........................................
     # the theanorc file
-    vgrspark.vm.provision "50a.theanorc",
+    vmconf.vm.provision "50a.theanorc",
     type: 'file',
     source: 'buildfiles/theanorc',
     destination: '/tmp/theanorc'
 
-    vgrspark.vm.provision "50b.theanorc",
+    vmconf.vm.provision "50b.theanorc",
     type: 'shell',
     privileged: true,
     inline: 'cp -p /tmp/theanorc /etc/theanorc'
 
-    
-    if (provision_run_tf)
-     # http://stackoverflow.com/questions/33634525/tensorflow-on-32-bit-linux
-     vgrspark.vm.provision "60.tf",
-     type: 'shell',
-     privileged: false,
-     args: [ python_version ],
-     inline: <<-SHELL
-       mkdir bazel
-       cd bazel
-       wget https://github.com/bazelbuild/bazel/releases/download/0.4.5/bazel-0.4.5-dist.zip
-       unzip bazel-0.4.5-dist.zip
-       patch < /vagrant/tensorflow/bazel-32bit.diff
-       ./compile.sh
-       ln -s $PWD/output/bazel $HOME/bin
-       wget https://github.com/tensorflow/tensorflow/archive/v1.0.1.tar.gz
-       tar zxvf v1.0.1.tar.gz 
-       cd tensorflow-1.0.1/
-       grep -Rl "lib64"| xargs sed -i 's/lib64/lib/g'
-       PYTHON_BIN_PATH=/opt/ipnb$1/bin/python CC_OPT_FLAGS='-march=native' TF_NEED_JEMALLOC=1 TF_NEED_GCP=0 TF_NEED_HDFS=0 TF_ENABLE_XLA=0 TF_NEED_OPENCL=0 TF_NEED_CUDA=0 USE_DEFAULT_PYTHON_LIB_PATH=1 ./configure
-       bazel build -c opt --jobs 1 --local_resources 1024,1.0,2.0 --verbose_failures //tensorflow/tools/pip_package:build_pip_package
-       bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp/tensorflow_pkg
-       cp -p /tmp/tensorflow_pkg/tensorflow-1.0.1-cp*-cp*-linux_i686.whl /vagrant/tensorflow
-      SHELL
-    end
-
     if (provision_run_dl)
-      vgrspark.vm.provision "61.dl",
+      vmconf.vm.provision "61.dl",
       type: "shell",
       privileged: false,
       keep_color: true,
       args: [ python_version ],
       inline: <<-SHELL
-         pip install --upgrade /vagrant/tensorflow/tensorflow-1.0.1-cp$1*.whl
+         pip install --upgrade tensorflow
          pip install --upgrade --no-deps git+git://github.com/Theano/Theano.git
          pip install --upgrade keras quiver
        SHELL
@@ -552,7 +508,7 @@ EOF
     
     # Clean
     if (provision_run_clean)
-      vgrspark.vm.provision "70.clean",
+      vmconf.vm.provision "70.clean",
       type: "shell",
       privileged: true,
       inline: <<-SHELL
