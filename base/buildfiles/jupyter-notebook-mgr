@@ -80,7 +80,7 @@ start() {
     LOG_FILE=${LOGDIR}/${DAEMON}.out
     echo "************ Start on $(date)" >> ${LOG_FILE}
     chown $NOTEBOOK_USER ${LOG_FILE}
-    runuser -l -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
+    runuser -l -s /bin/bash $NOTEBOOK_USER -c "nohup env LANG=en_US.UTF-8 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
 
     sleep 3
 

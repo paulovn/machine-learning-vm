@@ -8,9 +8,19 @@ spark.master=local[*]
 spark.eventLog.enabled=true
 spark.eventLog.dir=/var/log/ipnb
 
-# This is needed if we use the Graphframes library
-#spark.jars.packages=graphframes:graphframes:0.4.0-spark2.1-s_2.11
 
-# And this if we need Kafka integration in Spark Streaming. Using Kafka 0.8
-# (since the 0.10 version w/ the new consumer API does not yet work in Python) 
-#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.0.2
+# .............................................................................
+# Extra packages to add for additional functionality.
+# If more than one is needed, separate with commas
+
+# This is needed if we use the Graphframes library
+# Note: version 0.5.0 has a problem with the Python API
+#spark.jars.packages=graphframes:graphframes:0.4.0-spark2.2-s_2.11
+
+# And this if we need Kafka integration in Spark Streaming. There are two versions:
+# [1] "Classic" streaming. Using Kafka 0.8 (since the 0.10 version w/ the new consumer
+# API does not work in Python) 
+#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.2.0
+# [2] Structured streaming
+#spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.11:2.2.0
+

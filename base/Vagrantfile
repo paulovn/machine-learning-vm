@@ -16,7 +16,7 @@ python_version_full = python_version == '3' ? '3.5' : '2.7'
 # Variables defining the installation of Spark
 
 # The version of Spark we will download & install
-spark_version = '2.1.0'
+spark_version = '2.2.0'
 spark_name = 'spark-' + spark_version + '-bin-custom'
 #spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
@@ -36,10 +36,12 @@ vagrant_command = ARGV[0]
 # Conditionally activate some provision sections
 provision_run_dl = (ENV['PROVISION_DL'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('61.dl'))
+provision_run_scala = (ENV['PROVISION_SCALA'] == '1') || \
+        (vagrant_command == 'provision' && ARGV.include?('70.scala'))
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
-        (vagrant_command == 'provision' && ARGV.include?('70.clean'))
+        (vagrant_command == 'provision' && ARGV.include?('80.clean'))
 
-provision_run_dl = true
+#provision_run_dl = true
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -134,30 +136,42 @@ Vagrant.configure(2) do |config|
     privileged: true,
     inline: <<-SHELL
      apt-get update -y
+
+     # Ensure we get past this kernel bug:
+     # https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1699772
+     apt-get install linux-image-generic -y
+     # we'd need to remove the old kernels afterwards
+
      # Make some subdirectories in the vagrant home dir
      sudo -u vagrant -i mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
-     #XXXapt install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
-     #XXXapt install libopenblas-dev
+     #XXX apt install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
+     #XXX apt install libopenblas-dev
      # General utility programs
      apt-get install -y emacs-nox virtualenv
      # Other
-     #XXX(cd /etc/yum.repos.d; wget http://www.graphviz.org/graphviz-rhel.repo)
      apt-get install -y graphviz
+    SHELL
+
+    # Generate a few locales
+    vmconf.vm.provision "02.locales",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
      # customize locales
-     #locale-gen "es_ES.UTF-8" "es_AR.UTF-8" "es_CL.UTF-8" "pt_BR.UTF-8" "de_DE.UTF-8"
-     # dpkg-reconfigure locales
+     locale-gen "es" "pt" "de_DE.UTF-8"
+     dpkg-reconfigure -f noninteractive locales
     SHELL
 
     # .........................................
-    vmconf.vm.provision "02.jdk",
+    vmconf.vm.provision "10.jdk",
     type: "shell", 
     privileged: true, 
     inline: "apt-get install -y openjdk-8-jdk-headless"
    # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
 
-    # Install R from EPEL
-    vmconf.vm.provision "03.R",
+    # Install R
+    vmconf.vm.provision "11.R",
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
@@ -168,19 +182,19 @@ Vagrant.configure(2) do |config|
     SHELL
 
     # Install some R packages & the IR kernel for Jupyter
-    vmconf.vm.provision "04.Rpkg",
+    vmconf.vm.provision "12.Rpkg",
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
      RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
      mkdir -p $RDIR
      echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
+     echo "Installing R packages: rmarkdown, tidyverse, data.table, caret, neuralnet"
      apt-get install -y libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev
-     #yum -y install libcurl-devel libxml2-devel czmq-devel mysql-devel postgresql-devel cairo-devel libssh2-devel
-     for pkg in "'rmarkdown','magrittr'" \
-                "'dplyr','tidyr'" \
-                "'data.table','ggplot2'" \
-                "'caret'"
+     for pkg in "'rmarkdown'" \
+                "'tidyverse'" \
+                "'data.table'" \
+                "'caret','neuralnet'"
      do
          echo -e "\nInstalling R packages: $pkg"
          Rscript -e "install.packages(c($pkg),dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
@@ -191,17 +205,18 @@ Vagrant.configure(2) do |config|
      Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
 
      echo "Installing sparklyr"
-     # As of March 2017, we need to install from git to have support for 2.1
+     sudo apt-get install libcurl4-gnutls-dev
+     # As of July 2017, we need to install from git to have support for Spark 2.2
      Rscript -e 'devtools::install_github("rstudio/sparklyr")'
+     #Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
 
-     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev
-     #yum erase -y postgresql-devel mysql-devel cairo-devel gl-manpages glib2-devel libssh2-devel
+     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev
     SHELL
 
 
     # .........................................
     # Create a Python virtualenv and install wrappers to point there
-    vmconf.vm.provision "11.python.venv",
+    vmconf.vm.provision "15.python.venv",
     type: "shell", 
     privileged: false,
     args: [ python_version, python_version_full ],
@@ -225,7 +240,7 @@ Vagrant.configure(2) do |config|
     # .........................................
     # In the virtualenv, install the Python packages to use in the Notebooks
     # Plus a few ML-related more
-    vmconf.vm.provision "14.python.pkg",
+    vmconf.vm.provision "16.python.pkg",
     type: "shell", 
     keep_color: true,
     privileged: false, 
@@ -254,8 +269,11 @@ Vagrant.configure(2) do |config|
       ./pip install numexpr
       ./pip install statsmodels
       ./pip install scikit-learn
+      ./pip install imbalanced-learn
+      ./pip install xgboost
       ./pip install gensim
       ./pip install networkx
+
       ./pip install mpld3
       ./pip install seaborn
 
@@ -274,49 +292,44 @@ Vagrant.configure(2) do |config|
       ./jupyter nbextension enable --py widgetsnbextension --sys-prefix
     SHELL
 
-    vmconf.vm.provision "15.pylucene",
+    vmconf.vm.provision "17.pylucene",
     type: "shell",
     keep_color: true,
     privileged: false,
+    args: [ python_version ],
     inline: <<-SHELL
-    VENV=/opt/ipnb/bin
+    VENV=/opt/ipnb$1
 
     mkdir -p Soft
     cd Soft
     PKG=pylucene-6.5.0
     PKGFILE=$PKG-src.tar.gz
+    rm -rf $PKG $PKGFILE
     wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
     tar zxvf $PKGFILE
     cd $PKG
  
-    # Build JCC
-    export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
+
+    # Patch pylucene 6.5.0
     # http://mail-archives.apache.org/mod_mbox/lucene-pylucene-dev/201704.mbox/browser
-    patch -p0 <<EOF
---- jcc/setup.p.old	2017-05-18 11:08:48.644087400 +0200
-+++ jcc/setup.py	2017-05-18 11:31:22.307551100 +0200
-@@ -360,8 +360,8 @@
-                           '-current_version', jcc_ver,
-                           '-compatibility_version', jcc_ver]
-         elif platform == 'linux':
--            kwds["extra_link_args"] = \
--                lflags + ['-lpython%s.%s' %(sys.version_info[0:2])]
-+            #kwds["extra_link_args"] = \
-+            #    lflags + ['-lpython%s.%s' %(sys.version_info[0:2])]
-             kwds["force_shared"] = True    # requires jcc/patches/patch.43
-         elif platform in IMPLIB_LFLAGS:
-             jcclib = 'jcc%s%s.lib' %(py_version_suffix, debug and '_d' or '')
-EOF
+    patch -p0 < /vagrant/lucene/pylucene.patch
+
+    source $VENV/bin/activate
+
+    # Build JCC
     cd jcc
-    $VENV/bin/python setup.py build
-    $VENV/bin/python setup.py install
+    export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
+    python setup.py bdist_egg
+    easy_install dist/*.egg
+    #$VENV/bin/python setup.py build
+    #$VENV/bin/python setup.py install
     cd ..
 
     # build pylucene
     sudo apt-get install -y ant
     export PREFIX_PYTHON=$VENV
     export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
-    export PYTHON="$PREFIX_PYTHON/bin/python3"
+    export PYTHON="$PREFIX_PYTHON/bin/python$1"
     export "JCC=$PYTHON -m jcc --shared"
     export NUM_FILES=8
     make
@@ -325,22 +338,6 @@ EOF
     # install
     $VENV/bin/easy_install dist/*.egg
 
-    SHELL
-
-    # .........................................
-    # Install Scala
-    vmconf.vm.provision "20.scala",
-    type: "shell", 
-    privileged: false,
-    keep_color: true,    
-    args: [ spark_version, spark_name, spark_basedir ],
-    inline: <<-SHELL
-      # download & install Scala
-      cd install
-      VERSION=2.11.8
-      echo "Downloading Scala $VERSION"
-      wget --no-verbose http://downloads.lightbend.com/scala/$VERSION/scala-$VERSION.deb
-      sudo dpkg -i scala-$VERSION.deb
     SHELL
 
 
@@ -427,9 +424,7 @@ EOF
 
     # .........................................
     # Install the Toree Scala/Spark kernel
-    # We use a custom-built version compiled from master, to make sure that
-    # PR100 (https://github.com/apache/incubator-toree/pull/100), which fixes
-    # syntax highlighting, is included
+    # We use a custom-built version compiled from master
     vmconf.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
@@ -479,8 +474,8 @@ EOF
     source: 'buildfiles/style/kernel-icons',
     destination: spark_basedir
 
-
     # .........................................
+
     # the theanorc file
     vmconf.vm.provision "50a.theanorc",
     type: 'file',
@@ -504,22 +499,41 @@ EOF
          pip install --upgrade keras quiver
        SHELL
     end
-
     
+    # .........................................
+    # Install Scala
+    if (provision_run_scala)
+      vmconf.vm.provision "70.scala",
+      type: "shell",
+      privileged: false,
+      keep_color: true,
+      args: [ spark_version, spark_name, spark_basedir ],
+      inline: <<-SHELL
+        # download & install Scala
+        cd install
+        VERSION=2.11.8
+        echo "Downloading Scala $VERSION"
+        wget --no-verbose http://downloads.lightbend.com/scala/$VERSION/scala-$VERSION.deb
+        sudo dpkg -i scala-$VERSION.deb
+      SHELL
+    end
+
+    # .........................................
     # Clean
     if (provision_run_clean)
-      vmconf.vm.provision "70.clean",
+      vmconf.vm.provision "80.clean",
       type: "shell",
       privileged: true,
       inline: <<-SHELL
         echo "Cleaning temporal & installation files"
         HH=/home/vagrant
-        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/*
+        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
         rm -rf /tmp/Rtmp* /var/tmp/yum*
         apt-get autoclean -y
         apt-get clean -y 
-        apt-get autoremove -y
+        apt-get autoremove -y --purge
+        #dpkg --purge linux-image-4.4.0-81-generic linux-image-extra-4.4.0-81-generic
 
         # Remove bash history for root
         unset HISTFILE

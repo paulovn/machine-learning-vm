@@ -18,5 +18,7 @@ test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 #SPARK_LOCAL_HOSTNAME=
 #SPARK_PUBLIC_DNS=
 
-PYSPARK_PYTHON=python2.7
+# Set the Python to use for the driver
+PYSPARK_PYTHON=/opt/ipnb/bin/python
+# Default arguments for job submission
 PYSPARK_SUBMIT_ARGS="--deploy-mode client  --driver-memory 1536M  --num-executors 16 --executor-cores 2 --executor-memory 1g"

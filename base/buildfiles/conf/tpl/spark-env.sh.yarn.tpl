@@ -14,19 +14,18 @@ localip()
 # Try first eth1, which will usually be the bridged network
 test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 
-#SPARK_PUBLIC_DNS=
-#SPARK_LOCAL_HOSTNAME=
-#SPARK_PUBLIC_DNS=
-
-PYSPARK_PYTHON=python2.7
-PYSPARK_SUBMIT_ARGS="--master yarn-client --deploy-mode client  --driver-memory 1536M  --num-executors 16 --executor-cores 2 --executor-memory 1g"
+#SPARK_LOCAL_HOSTNAME=10.95.228.27
+#SPARK_PUBLIC_DNS=kongoni
+#SPARK_PUBLIC_DNS=10.95.230.226
 
 # This is for running in YARN modes
 HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}
 YARN_CONF_DIR=${YARN_CONF_DIR:-/opt/spark/current/conf/hadoop}
 #YARN_OPTS="--conf spark.yarn.historyServer.address={HOSTNAME-SPARK-HS}"
 
+# Set the Python to use for the driver
+PYSPARK_PYTHON=/opt/ipnb/bin/python
 
-#SPARK_PUBLIC_DNS=kongoni
-#SPARK_LOCAL_HOSTNAME=10.95.228.27
-#SPARK_PUBLIC_DNS=10.95.230.226
+# Default arguments for job submission
+PYSPARK_SUBMIT_ARGS="--master yarn-client --deploy-mode client  --driver-memory 1536M  --num-executors 16 --executor-cores 2 --executor-memory 1g"
+
