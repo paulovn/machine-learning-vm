@@ -285,7 +285,7 @@ Vagrant.configure(2) do |config|
       ./pip install gensim
       ./pip install networkx
 
-      ./pip install mpld3
+      #./pip install mpld3
       ./pip install seaborn
 
       ./pip install pydot-ng
