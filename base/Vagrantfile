@@ -41,6 +41,9 @@ provision_run_scala = (ENV['PROVISION_SCALA'] == '1') || \
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('80.clean'))
 
+# Scala kernel: Toree or SPylon?
+provision_run_toree = false
+
 #provision_run_dl = true
 
 # --------------------------------------------------------------------------
@@ -53,7 +56,11 @@ Vagrant.configure(2) do |config|
   config.ssh.insert_key = false
   #config.ssh.forward_agent = true
   #config.ssh.username = "ubuntu"
-  
+
+  # vagrant-vbguest plugin: set auto_update to false, if you do NOT want to
+  # check the correct additions version when booting this machine
+  config.vbguest.auto_update = false
+
   config.vm.define "vm-spark-base64" do |vmconf|
      
     # The most common configuration options are documented and commented below.
@@ -135,16 +142,20 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: true,
     inline: <<-SHELL
+     echo "Updating packages ..."
      apt-get update -y
+     apt-get upgrade -y
 
      # Ensure we get past this kernel bug:
      # https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1699772
+     echo "Installing latest kernel ..."
      apt-get install linux-image-generic -y
      # we'd need to remove the old kernels afterwards
 
      # Make some subdirectories in the vagrant home dir
      sudo -u vagrant -i mkdir bin install tmp
      # Install some basic packages + dev libraries to compile R/Python pkgs
+     # --not needed (many already by default on the base box) --
      #XXX apt install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
      #XXX apt install libopenblas-dev
      # General utility programs
@@ -175,10 +186,11 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: true, 
     inline: <<-SHELL
-     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
-     add-apt-repository -u "deb http://cran.es.r-project.org/bin/linux/ubuntu xenial/"
+     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+     add-apt-repository "deb https://cran.rediris.es/bin/linux/ubuntu xenial/"
+     apt-get update -y
      apt-get install -y r-recommended
-     #(r-base-dev)
+     #(another option: r-base-dev)
     SHELL
 
     # Install some R packages & the IR kernel for Jupyter
@@ -188,9 +200,8 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
      RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
      mkdir -p $RDIR
-     echo "Installing R packages: rmarkdown, magrittr, dplyr, tidyr, data.table, ggplot2"
      echo "Installing R packages: rmarkdown, tidyverse, data.table, caret, neuralnet"
-     apt-get install -y libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev
+     apt-get install -y pkg-config libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev libnlopt-dev
      for pkg in "'rmarkdown'" \
                 "'tidyverse'" \
                 "'data.table'" \
@@ -202,15 +213,15 @@ Vagrant.configure(2) do |config|
 
      echo "Installing IRkernel"
      Rscript -e 'install.packages( c("crayon","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
-     Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
+     #Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
+     Rscript -e 'devtools::install_github( "IRkernel/IRkernel" )'
 
      echo "Installing sparklyr"
      sudo apt-get install libcurl4-gnutls-dev
-     # As of July 2017, we need to install from git to have support for Spark 2.2
-     Rscript -e 'devtools::install_github("rstudio/sparklyr")'
-     #Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     #Rscript -e 'devtools::install_github("rstudio/sparklyr")'
+     Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
 
-     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev
+     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
     SHELL
 
 
@@ -308,7 +319,6 @@ Vagrant.configure(2) do |config|
     wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
     tar zxvf $PKGFILE
     cd $PKG
- 
 
     # Patch pylucene 6.5.0
     # http://mail-archives.apache.org/mod_mbox/lucene-pylucene-dev/201704.mbox/browser
@@ -388,13 +398,35 @@ Vagrant.configure(2) do |config|
     #  * spark-csv is now part of Spark 2.x
     #  * GraphFrames & Kafka Streaming can be declared as packages in
     #    Spark config and they will be automatically downloaded
+    #    --> install a local version of GraphFrames until 0.6 is available in Maven
+
+    # .........................................
+    # Install a local build of the GraphFrames package
+    vmconf.vm.provision "31.graphframes",
+    type: "file",
+    source: "buildfiles/graphframes-0.6.0-SNAPSHOT-spark2.2-s_2.11.jar",
+    destination: "/opt/spark/current/jars/extra/graphframes-0.6.0-SNAPSHOT-spark2.2-s_2.11.jar"
 
     # .........................................
     # Install the Spark configuration files for the different modes
-    vmconf.vm.provision "32.spark.cfg",
+    vmconf.vm.provision "32a.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
     destination: '/opt/spark/current'
+
+    # Prepare a configuration for loading a local GraphFrames JAR
+    vmconf.vm.provision "32b.spark.cfg.graphframes",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    args: [ spark_basedir ],
+    inline: <<-SHELL
+      cd $1/current/conf
+      for f in spark-env.sh spark-defaults.conf
+      do
+         sed 's|#GFL#||g' ${f}.local > ${f}.local.graphframes
+      done
+    SHELL
 
     # .........................................
     # Install the IPython Spark notebook daemon script
@@ -425,6 +457,7 @@ Vagrant.configure(2) do |config|
     # .........................................
     # Install the Toree Scala/Spark kernel
     # We use a custom-built version compiled from master
+    if (provision_run_toree)
     vmconf.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
@@ -432,7 +465,7 @@ Vagrant.configure(2) do |config|
     args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
       PKG=toree-0.2.0.dev1.tar.gz
-      echo "Installing the (Scala) Spark kernel $PKG"
+      echo "Installing the (Scala) Toree Spark kernel $PKG"
       # -- From PyPi
       #pip install toree
       # -- From the developer snapshot
@@ -444,6 +477,17 @@ Vagrant.configure(2) do |config|
       # -- From a locally available file
       pip install /vagrant/toree/$PKG 
     SHELL
+    else
+    vmconf.vm.provision "36.scala.kernel",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    args: [ spark_version, spark_name, spark_basedir, repo_base ],
+    inline: <<-SHELL
+      echo "Installing the (Scala) SPylon kernel"
+      pip install spylon_kernel
+    SHELL
+    end
 
 
     # .........................................
@@ -532,7 +576,7 @@ Vagrant.configure(2) do |config|
         rm -rf /tmp/Rtmp* /var/tmp/yum*
         apt-get autoclean -y
         apt-get clean -y 
-        apt-get autoremove -y --purge
+        #apt-get autoremove -y --purge
         #dpkg --purge linux-image-4.4.0-81-generic linux-image-extra-4.4.0-81-generic
 
         # Remove bash history for root

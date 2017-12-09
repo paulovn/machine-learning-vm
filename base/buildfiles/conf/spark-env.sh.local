@@ -16,3 +16,10 @@ PYSPARK_PYTHON=/opt/ipnb/bin/python
 
 # Default arguments for job submission
 PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 --executor-cores 2 --executor-memory 1g'
+
+
+# ------------------------------------------------------------------------------
+# To be able to use a local GraphFrames JAR in Python, enlarge PYTHONPATH with
+# the GraphFrames path
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes-0.6.0-SNAPSHOT-spark2.2-s_2.11.jar
+# ------------------------------------------------------------------------------
