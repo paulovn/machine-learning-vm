@@ -20,13 +20,20 @@
 . /lib/lsb/init-functions
 
 # Slurp the Spark notebook configuration
-CFGNAME=/etc/sysconfig/jupyter-notebook
+if test -d /etc/sysconfig/jupyter-notebook; then
+    CFGNAME=/etc/sysconfig/jupyter-notebook
+else
+    CFGNAME=/etc/jupyter/jupyter-notebook
+fi
 set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
 NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}
 export LOGDIR=${LOGDIR:-/var/log/ipnb}
+
+id ${NOTEBOOK_USER} 2>/dev/null || { echo "Error: user $NOTEBOOK_USER does not exist"; exit 1; }
+test -f ${NOTEBOOK_SCRIPT} || { echo "Error: can't find script $NOTEBOOK_SCRIPT"; exit 1; }
 
 DESC="Jupyter Notebook"
 DAEMON="jupyter-notebook"
@@ -73,7 +80,7 @@ start() {
     LOG_FILE=${LOGDIR}/${DAEMON}.out
     echo "************ Start on $(date)" >> ${LOG_FILE}
     chown $NOTEBOOK_USER ${LOG_FILE}
-    runuser -l -s /bin/bash $NOTEBOOK_USER -c "nohup nice -n 0 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
+    runuser -l -s /bin/bash $NOTEBOOK_USER -c "nohup env LANG=en_US.UTF-8 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
 
     sleep 3
 
