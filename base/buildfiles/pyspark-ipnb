@@ -9,4 +9,4 @@ export PYSPARK_DRIVER_PYTHON_OPTS="$@"
 export PYSPARK_DRIVER_PYTHON=/opt/ipnb/bin/python
 
 # Start Pyspark with no arguments -- it will fetch its options from spark config
-exec /opt/spark/current/bin/pyspark
+exec /opt/spark/current/bin/pyspark --name 'Jupyter Notebook'

@@ -1,3 +1,13 @@
+v. 2.1.0
+ * Spark is 2.3.0 (custom built, to include native BLAS bindings)
+ * Added Cartopy
+ * Python packages updated to latest version. Installed Seaborn from github master
+ * pydot-ng changed for pydot
+ * GraphViz compiled from source, to allow the use of "sfdp" engine
+ * GraphFrames updated to latest 0.6.0 snapshot
+ * Set PYSPARK_DRIVER_PYTHON to ipython, but only if not set (by e.g. Jupyter)
+ * R 3.4.4
+
 v. 2.0.1
  * Based on Ubuntu 16.04
  * Python is version 3.5
@@ -5,7 +15,7 @@ v. 2.0.1
  * IPython 6
  * R 3.4.2
  * Use SPylon for Scala kernel
- * Add a custom GraphGrames 0.6.0 snapshot build, with suitable configuration
+ * Add a custom GraphFrames 0.6.0 snapshot build, with suitable configuration
 
 v. 1.9.7
  * Improved cleanup for box size reduction
