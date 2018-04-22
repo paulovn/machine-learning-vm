@@ -14,7 +14,7 @@ look at the [ChangeLog][cl] file.
 
 
 The VM is managed through Vagrant. Software requirements for the host are:
- * Vagrant 1.7.4 or above
+ * Vagrant 1.9.6 or above
  * VirtualBox 5.0 or above
 
 

@@ -1,0 +1,6 @@
+buildfiles/graphframes*
+buildfiles/style/old
+buildfiles/style/*.xcf
+buildfiles/nbconvert
+buildfiles/IPython-notebook-extensions
+vmfiles

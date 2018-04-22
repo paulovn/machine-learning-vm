@@ -16,7 +16,7 @@ python_version_full = python_version == '3' ? '3.5' : '2.7'
 # Variables defining the installation of Spark
 
 # The version of Spark we will download & install
-spark_version = '2.2.0'
+spark_version = '2.3.0'
 spark_name = 'spark-' + spark_version + '-bin-custom'
 #spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
 
@@ -160,8 +160,6 @@ Vagrant.configure(2) do |config|
      #XXX apt install libopenblas-dev
      # General utility programs
      apt-get install -y emacs-nox virtualenv
-     # Other
-     apt-get install -y graphviz
     SHELL
 
     # Generate a few locales
@@ -172,6 +170,27 @@ Vagrant.configure(2) do |config|
      # customize locales
      locale-gen "es" "pt" "de_DE.UTF-8"
      dpkg-reconfigure -f noninteractive locales
+    SHELL
+
+    # Compile graphviz from source
+    # (the Ubuntu package was not built with gts and hence cannot use sfdp)
+    vmconf.vm.provision "03.graphviz",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
+     apt install -y libgts-dev libann-dev libgd-dev librsvg2-dev
+     pkg-config --libs gts
+     pkg-config --cflags gts
+
+     wget https://graphviz.gitlab.io/pub/graphviz/stable/SOURCES/graphviz.tar.gz
+     tar xzvf graphviz.tar.gz
+     cd graphviz-*
+     ANN_CFLAGS=-I/usr/include ANN_LIBS=-lann ./configure --with-gts --with-ann
+     make
+     make install
+     apt-get remove -y libgd-dev librsvg2-dev
+     cd ..
+     rm -rf graphviz*
     SHELL
 
     # .........................................
@@ -286,9 +305,9 @@ Vagrant.configure(2) do |config|
       ./pip install networkx
 
       #./pip install mpld3
-      ./pip install seaborn
+      ./pip install https://github.com/mwaskom/seaborn/archive/master.zip
 
-      ./pip install pydot-ng
+      ./pip install pydot
       ./pip install graphviz
 
       ./pip install hdfs
@@ -350,6 +369,33 @@ Vagrant.configure(2) do |config|
 
     SHELL
 
+    vmconf.vm.provision "18.cartopy",
+    type: "shell",
+    keep_color: true,
+    privileged: false,
+    args: [ python_version ],
+    inline: <<-SHELL
+      # Install dependencies to generate GEOS Python bindings
+      sudo apt-get install -y swig
+      # Install GEOS from source
+      V=3.6.2
+      wget http://download.osgeo.org/geos/geos-$V.tar.bz2
+      tar xvfj geos-$V.tar.bz2
+      cd geos-$V
+      PYTHON=/usr/bin/python3.5 ./configure --enable-python
+      ./configure
+      make
+      sudo make install
+      cd ..
+      rm -rf geos-${V}*
+      # Install other Cartopy dependencies, and the package
+      sudo apt-get install -y libproj-dev
+      pip install cython
+      pip install cartopy
+      # Remove stuff we do not need for runtime
+      pip uninstall -y cython
+      sudo apt-get remove -y swig
+    SHELL
 
     # .........................................
     # Install a pre-built Spark
@@ -363,7 +409,7 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
 
       # download & install Spark
-      sudo bash -c "mkdir -m 775 '$3'; chown vagrant.vagrant '$3'; cd $3; rm -f current; ln -s $2/ current"
+      sudo bash -c "mkdir -p -m 775 '$3'; chown vagrant.vagrant '$3'; cd $3; rm -f current; ln -s $2/ current"
       case $2 in
         *custom) 
            file="/vagrant/spark/$2.tgz";;
@@ -404,15 +450,15 @@ Vagrant.configure(2) do |config|
     # Install a local build of the GraphFrames package
     vmconf.vm.provision "31.graphframes",
     type: "file",
-    source: "buildfiles/graphframes-0.6.0-SNAPSHOT-spark2.2-s_2.11.jar",
-    destination: "/opt/spark/current/jars/extra/graphframes-0.6.0-SNAPSHOT-spark2.2-s_2.11.jar"
+    source: "buildfiles/graphframes/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar",
+    destination: "/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar"
 
     # .........................................
     # Install the Spark configuration files for the different modes
     vmconf.vm.provision "32a.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
-    destination: '/opt/spark/current'
+    destination: '/opt/spark/current/conf'
 
     # Prepare a configuration for loading a local GraphFrames JAR
     vmconf.vm.provision "32b.spark.cfg.graphframes",
@@ -503,7 +549,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "41.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
-    destination: "/opt/ipnb#{python_version}/share/jupyter"
+    destination: "/opt/ipnb#{python_version}/share/jupyter/nbextensions"
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
@@ -516,7 +562,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "43.icon.kernel",
     type: "file", 
     source: 'buildfiles/style/kernel-icons',
-    destination: spark_basedir
+    destination: spark_basedir + '/kernel-icons'
 
     # .........................................
 
@@ -570,13 +616,20 @@ Vagrant.configure(2) do |config|
       privileged: true,
       inline: <<-SHELL
         echo "Cleaning temporal & installation files"
-        HH=/home/vagrant
-        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
-        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
-        rm -rf /tmp/Rtmp* /var/tmp/yum*
         apt-get autoclean -y
-        apt-get clean -y 
+        apt-get clean -y
+        apt-get remove -y libx11-dev ibgdk-pixbuf2.0-dev libice-dev libxpm-dev \
+                          libpixman-1-dev libpthread-stubs0-dev libxt-dev \
+                          libxcb-shm0-dev libxcb1-dev libxdmcp-dev libxext-dev \
+                          x11proto-core-dev x11proto-input-dev x11proto-kb-dev \
+                          x11proto-render-dev x11proto-xext-dev xtrans-dev \
+                          krb5-multidev libaec-dev libjbig-dev libtiff5-dev \
+                          libvpx-dev
+
+        # --- don't do this -- we may remove something needed (because it is used
+        # by a compiled program, so no dependencies)
         #apt-get autoremove -y --purge
+        # this will need to be done by hand
         #dpkg --purge linux-image-4.4.0-81-generic linux-image-extra-4.4.0-81-generic
 
         # Remove bash history for root
@@ -588,7 +641,12 @@ Vagrant.configure(2) do |config|
         find /var/log -type f | while read f; do echo -ne '' > $f; done;
 
         # Remove all temporal files
-        rm -rf /tmp/*
+        rm -rf /tmp/* /var/tmp/*
+
+        # Remove leftovers
+        HH=/home/vagrant
+        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
         # Zero free space
         echo "Whiteout root & boot partitions"
@@ -612,7 +670,6 @@ Vagrant.configure(2) do |config|
 
       SHELL
     end
-
 
 
   end
