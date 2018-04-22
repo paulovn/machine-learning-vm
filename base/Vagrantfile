@@ -15,16 +15,19 @@ python_version_full = python_version == '3' ? '3.5' : '2.7'
 # --------------------------------------------------------------------------
 # Variables defining the installation of Spark
 
-# The version of Spark we will download & install
+# The version of Spark we will install
 spark_version = '2.3.0'
+# [A] Install a locallay available custom build
 spark_name = 'spark-' + spark_version + '-bin-custom'
-#spark_name = 'spark-' + spark_version + '-bin-hadoop2.6'
+# [B] Download & install a standard binary distribution
+#spark_name = 'spark-' + spark_version + '-bin-hadoop2.7'
 
 # The place where Spark will be deployed inside the local machine
 # There is usually no need to change this
 spark_basedir = '/opt/spark'
 
-# An artifact repository where some custom-built files may be kept
+# A local artifact repository where some custom-built files might be kept
+# Currently not used
 repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
 
 # --------------------------------------------------------------------------
@@ -405,7 +408,7 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: false,
     keep_color: true,
-    args: [ spark_version, spark_name, spark_basedir, repo_base ],
+    args: [ spark_version, spark_name, spark_basedir ],
     inline: <<-SHELL
 
       # download & install Spark
@@ -512,15 +515,15 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
       PKG=toree-0.2.0.dev1.tar.gz
       echo "Installing the (Scala) Toree Spark kernel $PKG"
-      # -- From PyPi
+      # -- [A] From PyPi
       #pip install toree
-      # -- From the developer snapshot
+      # -- [B] From the developer snapshot
       #pip install https://dist.apache.org/repos/dist/dev/incubator/toree/0.2.0/snapshots/dev1/toree-pip/$PKG
-      # -- From a local repository
+      # -- [C] From a local repository
       #cd $HOME/install
       #wget --no-verbose "${4}spark-kernel/$1/$PKG"
       #pip install $PKG
-      # -- From a locally available file
+      # -- [D] From a locally available file
       pip install /vagrant/toree/$PKG 
     SHELL
     else
@@ -528,7 +531,6 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: false,
     keep_color: true,
-    args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
       echo "Installing the (Scala) SPylon kernel"
       pip install spylon_kernel
