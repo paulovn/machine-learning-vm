@@ -278,7 +278,7 @@ Vagrant.configure(2) do |config|
     keep_color: true,
     privileged: false, 
     inline: <<-SHELL
-      sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev
+      sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev gsfonts
       #yum -y install openblas-devel hdf5-devel
 
       cd /opt/ipnb/bin
@@ -289,37 +289,32 @@ Vagrant.configure(2) do |config|
 
       ./pip install pyparsing
       ./pip install matplotlib
-      ./pip install ipython
-      ./pip install jupyter     
-      ./pip install notebook
-      ./pip install ipywidgets
+      ./pip install ipython jupyter notebook ipywidgets
 
       ./pip install h5py
       ./pip install tables
+      ./pip install hdfs
+      ./pip install pyarrow
+      ./pip install openpyxl
+      #./pip install xlrd
 
-      ./pip install pandas
-      ./pip install bottleneck
-      ./pip install numexpr
+      ./pip install pandas bottleneck numexpr
+
       ./pip install statsmodels
       ./pip install scikit-learn
       ./pip install imbalanced-learn
       ./pip install xgboost
       ./pip install gensim
       ./pip install networkx
-
-      #./pip install mpld3
       ./pip install https://github.com/mwaskom/seaborn/archive/master.zip
+      #./pip install mpld3
 
-      ./pip install pydot
-      ./pip install graphviz
+      ./pip install pydot graphviz
 
-      ./pip install hdfs
-      ./pip install xlrd
-      ./pip install openpyxl
+      ./pip install dask
 
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype6-dev
-      #sudo yum -y erase hdf5-devel
 
       # Enable ipywidgets
       ./jupyter nbextension enable --py widgetsnbextension --sys-prefix
