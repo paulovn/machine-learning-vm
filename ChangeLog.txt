@@ -1,6 +1,17 @@
+v. 2.2.0
+ * Based on Ubuntu 18.04
+ * Uses Python 3.6
+ * Spark is 2.3.2 (custom built, to include native BLAS bindings)
+ * Python packages updated to latest version. Added jupyterlab
+ * PyLucene updated to 7.5.0
+ * Graphframes 0.6.0 release
+ * Added gsfonts to the base image (graphviz needs it)
+ * R 3.5.1
+
 v. 2.1.0
  * Spark is 2.3.0 (custom built, to include native BLAS bindings)
  * Added Cartopy
+ * Added PyLucene
  * Python packages updated to latest version. Installed Seaborn from github master
  * pydot-ng changed for pydot
  * GraphViz compiled from source, to allow the use of "sfdp" engine

@@ -26,7 +26,7 @@ spark.eventLog.dir=/var/log/ipnb
 
 # [2] point to a locally downloaded copy, and declare also its dependencies
 
-#GFL#spark.jars=/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar
+#GFL#spark.jars=/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-spark2.3.jar
 #GFL#spark.jars.packages=com.typesafe.scala-logging:scala-logging-slf4j_2.11:2.1.2,com.typesafe.scala-logging:scala-logging-api_2.11:2.1.2
 
 # ... and to use it in Python, don't forget to add it in spark-env.sh
@@ -38,8 +38,8 @@ spark.eventLog.dir=/var/log/ipnb
 # [1] "Classic" streaming. Using Kafka 0.8 (since the 0.10 version w/ the new
 # consumer API does not work in Python)
 
-#KFC#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.3.0
+#KFC#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-8_2.11:2.3.2
 
 # [2] Structured streaming
 
-#KFS#spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.0
+#KFS#spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2
