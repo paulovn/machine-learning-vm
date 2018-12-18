@@ -37,7 +37,7 @@ test -f ${NOTEBOOK_SCRIPT} || { echo "Error: can't find script $NOTEBOOK_SCRIPT"
 
 DESC="Jupyter Notebook"
 DAEMON="jupyter-notebook"
-VARDIR="/var/run/ipnb"
+VARDIR="/run/ipnb"
 PIDFILE="$VARDIR/$DAEMON.pid"
 LOCKDIR="/var/lock/subsys"
 LOCKFILE="$LOCKDIR/$DAEMON"
@@ -58,11 +58,15 @@ EXEC_PATH=$NOTEBOOK_SCRIPT
 EXEC_DIR=""
 DAEMON_FLAGS=""
 
-for d in "$VARDIR" "LOGDIR"
+# Ensure directories exist
+for d in "$LOGDIR"
 do
-    [ -d "$d" ]  || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER "$d" 1>/dev/null 2>&1 || :
+    [ -d "$d" ] || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER "$d" 1>/dev/null 2>&1 || :
 done
-[ -d "$LOCKDIR" ] || install -d -m 0755 $LOCKDIR 1>/dev/null 2>&1 || :
+for d in "$VARDIR" "$LOCKDIR"
+do
+    [ -d "$d" ] || install -d -m 0755 "$d" 1>/dev/null 2>&1 || :
+done
 
 
 start() {
@@ -80,7 +84,7 @@ start() {
     LOG_FILE=${LOGDIR}/${DAEMON}.out
     echo "************ Start on $(date)" >> ${LOG_FILE}
     chown $NOTEBOOK_USER ${LOG_FILE}
-    runuser $NOTEBOOK_USER -l -s /bin/bash  -c "nohup env LANG=en_US.UTF-8 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $!' > $PIDFILE
+    runuser $NOTEBOOK_USER -l -s /bin/bash  -c "nohup env LANG=en_US.UTF-8 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $! ' > $PIDFILE
 
     sleep 3
 

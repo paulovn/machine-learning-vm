@@ -1,0 +1,62 @@
+*** Makefile.orig	2018-08-28 17:42:59.000000000 +0000
+--- Makefile	2018-10-27 12:42:32.638925999 +0000
+***************
+*** 142,150 ****
+  JARS+=$(FACET_JAR)              # facet module
+  JARS+=$(SUGGEST_JAR)            # suggest/spell module
+  JARS+=$(EXPRESSIONS_JAR)        # expressions module
+! JARS+=$(KUROMOJI_JAR)           # japanese analyzer module
+  JARS+=$(MISC_JAR)               # misc
+! 
+  
+  #
+  # No edits required below
+--- 142,150 ----
+  JARS+=$(FACET_JAR)              # facet module
+  JARS+=$(SUGGEST_JAR)            # suggest/spell module
+  JARS+=$(EXPRESSIONS_JAR)        # expressions module
+! #JARS+=$(KUROMOJI_JAR)           # japanese analyzer module
+  JARS+=$(MISC_JAR)               # misc
+! JARS+=$(PHONETIC_JAR)		# phonetic analyzer module
+  
+  #
+  # No edits required below
+***************
+*** 173,184 ****
+--- 173,186 ----
+  SUGGEST_JAR=$(LUCENE)/build/suggest/lucene-suggest-$(LUCENE_VER).jar
+  EXPRESSIONS_JAR=$(LUCENE)/build/expressions/lucene-expressions-$(LUCENE_VER).jar
+  KUROMOJI_JAR=$(LUCENE)/build/analysis/kuromoji/lucene-analyzers-kuromoji-$(LUCENE_VER).jar
++ PHONETIC_JAR=$(LUCENE)/build/analysis/phonetic/lucene-analyzers-phonetic-$(LUCENE_VER).jar
+  MISC_JAR=$(LUCENE)/build/misc/lucene-misc-$(LUCENE_VER).jar
+  
+  ANTLR_JAR=$(LUCENE)/expressions/lib/antlr4-runtime-4.5.1-1.jar
+  ASM_JAR=$(LUCENE)/expressions/lib/asm-5.1.jar
+  ASM_COMMONS_JAR=$(LUCENE)/expressions/lib/asm-commons-5.1.jar
+  HPPC_JAR=$(LUCENE)/facet/lib/hppc-0.8.1.jar
++ APACHE_COMMONS_CODECS_JAR=$(LUCENE)/analysis/phonetic/lib/commons-codec-1.10.jar
+  
+  ICUPKG:=$(shell which icupkg)
+  
+***************
+*** 260,265 ****
+--- 262,270 ----
+  $(KUROMOJI_JAR): $(LUCENE_JAR)
+  	cd $(LUCENE)/analysis/kuromoji; $(ANT) -Dversion=$(LUCENE_VER)
+  
++ $(PHONETIC_JAR): $(LUCENE_JAR)
++ 	cd $(LUCENE)/analysis/phonetic; $(ANT) -Dversion=$(LUCENE_VER)
++ 
+  $(MISC_JAR): $(LUCENE_JAR)
+  	cd $(LUCENE)/misc; $(ANT) -Dversion=$(LUCENE_VER)
+  
+***************
+*** 294,299 ****
+--- 299,305 ----
+  
+  GENERATE=$(JCC) $(foreach jar,$(JARS),--jar $(jar)) \
+             $(JCCFLAGS) --use_full_names \
++            --include $(APACHE_COMMONS_CODECS_JAR) \
+             --include $(ANTLR_JAR) \
+             --include $(ASM_JAR) \
+             --include $(ASM_COMMONS_JAR) \

@@ -10,14 +10,14 @@ vagrant_command = ARGV[0]
 # Python version for which we will be creating the notebook environment (2 or 3)
 python_version = '3'
 
-python_version_full = python_version == '3' ? '3.5' : '2.7'
+python_version_full = python_version == '3' ? '3.6' : '2.7'
 
 # --------------------------------------------------------------------------
 # Variables defining the installation of Spark
 
 # The version of Spark we will install
-spark_version = '2.3.0'
-# [A] Install a locallay available custom build
+spark_version = '2.3.2'
+# [A] Install a locally available custom build
 spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
 #spark_name = 'spark-' + spark_version + '-bin-hadoop2.7'
@@ -72,7 +72,7 @@ Vagrant.configure(2) do |config|
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vmconf.vm.box = "bento/ubuntu-16.04"
+    vmconf.vm.box = "bento/ubuntu-18.04"
     #vmconf.vm.box_version = "2.2.9"
 
     # Disable automatic box update checking. If you disable this, then
@@ -147,12 +147,13 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
      echo "Updating packages ..."
      apt-get update -y
-     apt-get upgrade -y
+     #DEBIAN_FRONTEND=noninteractive apt-get install -y keyboard-configuration
+     DEBIAN_FRONTEND=noninteractive apt-get --yes --option Dpkg::Options::="--force-confdef" upgrade
 
      # Ensure we get past this kernel bug:
      # https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1699772
-     echo "Installing latest kernel ..."
-     apt-get install linux-image-generic -y
+     #echo "Installing latest kernel ..."
+     #apt-get install linux-image-generic -y
      # we'd need to remove the old kernels afterwards
 
      # Make some subdirectories in the vagrant home dir
@@ -181,7 +182,7 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: true,
     inline: <<-SHELL
-     apt install -y libgts-dev libann-dev libgd-dev librsvg2-dev
+     apt-get install -y libgts-dev libann-dev libgd-dev librsvg2-dev
      pkg-config --libs gts
      pkg-config --cflags gts
 
@@ -201,7 +202,6 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: true, 
     inline: "apt-get install -y openjdk-8-jdk-headless"
-   # http://stackoverflow.com/questions/10268583/downloading-java-jdk-on-linux-via-wget-is-shown-license-page-instead
 
     # Install R
     vmconf.vm.provision "11.R",
@@ -209,7 +209,7 @@ Vagrant.configure(2) do |config|
     privileged: true, 
     inline: <<-SHELL
      apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-     add-apt-repository "deb https://cran.rediris.es/bin/linux/ubuntu xenial/"
+     add-apt-repository "deb https://cran.rediris.es/bin/linux/ubuntu bionic-cran35/"
      apt-get update -y
      apt-get install -y r-recommended
      #(another option: r-base-dev)
@@ -289,13 +289,13 @@ Vagrant.configure(2) do |config|
 
       ./pip install pyparsing
       ./pip install matplotlib
-      ./pip install ipython jupyter notebook ipywidgets
+      ./pip install ipython jupyter notebook jupyterlab ipywidgets
 
       ./pip install h5py
       ./pip install tables
       ./pip install hdfs
       ./pip install pyarrow
-      ./pip install openpyxl
+      ./pip install openpyxl xlrd
       #./pip install xlrd
 
       ./pip install pandas bottleneck numexpr
@@ -306,7 +306,7 @@ Vagrant.configure(2) do |config|
       ./pip install xgboost
       ./pip install gensim
       ./pip install networkx
-      ./pip install https://github.com/mwaskom/seaborn/archive/master.zip
+      ./pip install seaborn
       #./pip install mpld3
 
       ./pip install pydot graphviz
@@ -330,33 +330,37 @@ Vagrant.configure(2) do |config|
 
     mkdir -p Soft
     cd Soft
-    PKG=pylucene-6.5.0
+    PKG=pylucene-7.5.0
     PKGFILE=$PKG-src.tar.gz
     rm -rf $PKG $PKGFILE
     wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
     tar zxvf $PKGFILE
     cd $PKG
 
-    # Patch pylucene 6.5.0
-    # http://mail-archives.apache.org/mod_mbox/lucene-pylucene-dev/201704.mbox/browser
-    patch -p0 < /vagrant/lucene/pylucene.patch
+    # Patch JCC to make it build a shared JCC version in Linux
+    # (make it identify a modern setuptools)
+    # [already done in pylucene 7.5.0]
+    #patch -p0 < /vagrant/lucene/jcc.patch
+
+    # Patch the Makefile to add the phonetic analysis classes to Pylucene
+    patch -p0 < /vagrant/lucene/Makefile.patch
 
     source $VENV/bin/activate
 
     # Build JCC
     cd jcc
     export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
+    #python setup.py bdist
+    #python setup.py install
     python setup.py bdist_egg
-    easy_install dist/*.egg
-    #$VENV/bin/python setup.py build
-    #$VENV/bin/python setup.py install
+    $VENV/bin/easy_install dist/*.egg
     cd ..
 
     # build pylucene
     sudo apt-get install -y ant
     export PREFIX_PYTHON=$VENV
     export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
-    export PYTHON="$PREFIX_PYTHON/bin/python$1"
+    export PYTHON="${PREFIX_PYTHON}/bin/python$1"
     export "JCC=$PYTHON -m jcc --shared"
     export NUM_FILES=8
     make
@@ -376,7 +380,7 @@ Vagrant.configure(2) do |config|
       # Install dependencies to generate GEOS Python bindings
       sudo apt-get install -y swig
       # Install GEOS from source
-      V=3.6.2
+      V=3.6.3
       wget http://download.osgeo.org/geos/geos-$V.tar.bz2
       tar xvfj geos-$V.tar.bz2
       cd geos-$V
@@ -441,15 +445,13 @@ Vagrant.configure(2) do |config|
     # No Spark add-ons installed
     #  * spark-csv is now part of Spark 2.x
     #  * GraphFrames & Kafka Streaming can be declared as packages in
-    #    Spark config and they will be automatically downloaded
-    #    --> install a local version of GraphFrames until 0.6 is available in Maven
-
+    #    Spark config and they will be automatically downloaded    # 
     # .........................................
     # Install a local build of the GraphFrames package
-    vmconf.vm.provision "31.graphframes",
-    type: "file",
-    source: "buildfiles/graphframes/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar",
-    destination: "/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar"
+    #vmconf.vm.provision "31.spark.pkg",
+    #type: "file",
+    #source: "buildfiles/graphframes/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar",
+    #destination: "/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar"
 
     # .........................................
     # Install the Spark configuration files for the different modes
@@ -458,7 +460,7 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/conf',
     destination: '/opt/spark/current/conf'
 
-    # Prepare a configuration for loading a local GraphFrames JAR
+    # Prepare a configuration for using GraphFrames
     vmconf.vm.provision "32b.spark.cfg.graphframes",
     type: "shell",
     privileged: false,
@@ -468,7 +470,7 @@ Vagrant.configure(2) do |config|
       cd $1/current/conf
       for f in spark-env.sh spark-defaults.conf
       do
-         sed 's|#GFL#||g' ${f}.local > ${f}.local.graphframes
+         sed 's|#GFP#||g' ${f}.local > ${f}.local.graphframes
       done
     SHELL
 
@@ -624,7 +626,7 @@ Vagrant.configure(2) do |config|
                           libvpx-dev
 
         # --- don't do this -- we may remove something needed (because it is used
-        # by a compiled program, so no dependencies)
+        # by a program that was compiled, so no dependencies declared)
         #apt-get autoremove -y --purge
         # this will need to be done by hand
         #dpkg --purge linux-image-4.4.0-81-generic linux-image-extra-4.4.0-81-generic

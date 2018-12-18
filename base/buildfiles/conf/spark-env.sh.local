@@ -9,7 +9,7 @@ unset HADOOP_CONF_DIR
 # This enables netlib-java to use the optimized BLAS libraries
 # For this to work, the Spark distribution needs to contain the native reference
 # implementation (which binary pre-built packages do not usually include)
-LD_PRELOAD=/usr/lib/libopenblas.so
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libopenblas.so
 
 # Set the Python to use for executors
 PYSPARK_PYTHON=/opt/ipnb/bin/python
@@ -23,5 +23,5 @@ PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 -
 # ------------------------------------------------------------------------------
 # To be able to use a local GraphFrames JAR in Python, enlarge PYTHONPATH with
 # the GraphFrames path
-#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-spark2.3.jar
 # ------------------------------------------------------------------------------
