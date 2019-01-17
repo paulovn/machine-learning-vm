@@ -23,5 +23,5 @@ PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 -
 # ------------------------------------------------------------------------------
 # To be able to use a local GraphFrames JAR in Python, enlarge PYTHONPATH with
 # the GraphFrames path
-#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-spark2.3.jar
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.7.0-spark2.4.jar
 # ------------------------------------------------------------------------------

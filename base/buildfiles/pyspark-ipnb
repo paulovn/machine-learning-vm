@@ -8,5 +8,18 @@ export PYSPARK_DRIVER_PYTHON_OPTS="$@"
 # Set the Python to use for the driver, when inside a notebook
 export PYSPARK_DRIVER_PYTHON=/opt/ipnb/bin/python
 
+# Find the next id in the application sequence
+next_seq()
+{
+  (
+     flock 9
+     IDFILE=/run/ipnb/pyspark-ipnb
+     NUM=$(<$IDFILE)
+     ((NUM++))
+     echo $NUM >$IDFILE
+     echo $NUM
+  ) 9>/tmp/pyspark-ipynb
+}
+
 # Start Pyspark with no arguments -- it will fetch its options from spark config
-exec /opt/spark/current/bin/pyspark --name 'Jupyter Notebook'
+exec /opt/spark/current/bin/pyspark --name "Jupyter Notebook #$(next_seq)"

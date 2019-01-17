@@ -41,6 +41,7 @@ VARDIR="/run/ipnb"
 PIDFILE="$VARDIR/$DAEMON.pid"
 LOCKDIR="/var/lock/subsys"
 LOCKFILE="$LOCKDIR/$DAEMON"
+IDFILE="$VARDIR/pyspark-ipnb"
 
 RETVAL_SUCCESS=0
 
@@ -58,7 +59,7 @@ EXEC_PATH=$NOTEBOOK_SCRIPT
 EXEC_DIR=""
 DAEMON_FLAGS=""
 
-# Ensure directories exist
+# Ensure directories & files exist
 for d in "$LOGDIR"
 do
     [ -d "$d" ] || install -d -m 0755 -o $NOTEBOOK_USER -g $NOTEBOOK_USER "$d" 1>/dev/null 2>&1 || :
@@ -67,6 +68,7 @@ for d in "$VARDIR" "$LOCKDIR"
 do
     [ -d "$d" ] || install -d -m 0755 "$d" 1>/dev/null 2>&1 || :
 done
+test -f $IDFILE || { echo 0 > $IDFILE; chown $NOTEBOOK_USER.$NOTEBOOK_USER $IDFILE; }
 
 
 start() {
