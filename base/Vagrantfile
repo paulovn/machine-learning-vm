@@ -254,6 +254,7 @@ Vagrant.configure(2) do |config|
     privileged: false,
     args: [ python_version, python_version_full ],
     inline: <<-SHELL
+     # Prepare the place
      sudo rm -rf /opt/ipnb$1
      sudo mkdir -m 775 /opt/ipnb$1
      sudo chown vagrant.vagrant /opt/ipnb$1
@@ -264,8 +265,9 @@ Vagrant.configure(2) do |config|
      # Create a virtualenv
      virtualenv -p python$1 /opt/ipnb$1 --no-site-packages
 
+     # Make links for vagrant user
      cd $HOME/bin
-     rm -f python python$1 pip
+     rm -f python python$2 pip
      ln -s /opt/ipnb$1/bin/{python,python$2,pip} .
     SHELL
 
@@ -289,12 +291,17 @@ Vagrant.configure(2) do |config|
 
       ./pip install pyparsing
       ./pip install matplotlib
+
+      # Versions fixed as requirement of Spark 2.4.0
+      ./pip install pyarrow==0.10.0
+      ./pip install pandas==0.23.4
+
       ./pip install ipython jupyter notebook jupyterlab ipywidgets
 
+      ./pip install pillow
       ./pip install h5py
       ./pip install tables
       ./pip install hdfs
-      ./pip install pyarrow
       ./pip install openpyxl xlrd
       #./pip install xlrd
 
@@ -384,7 +391,7 @@ Vagrant.configure(2) do |config|
       wget http://download.osgeo.org/geos/geos-$V.tar.bz2
       tar xvfj geos-$V.tar.bz2
       cd geos-$V
-      PYTHON=/usr/bin/python3.5 ./configure --enable-python
+      PYTHON=/usr/bin/python3 ./configure --enable-python
       ./configure
       make
       sudo make install
@@ -394,6 +401,8 @@ Vagrant.configure(2) do |config|
       sudo apt-get install -y libproj-dev
       pip install cython
       pip install cartopy
+      # [Note: cartopy does not install with pip 19.0, it needs pip 18.1
+      # see https://github.com/pypa/pip/issues/6163]
       # Remove stuff we do not need for runtime
       pip uninstall -y cython
       sudo apt-get remove -y swig
@@ -644,7 +653,7 @@ Vagrant.configure(2) do |config|
 
         # Remove leftovers
         HH=/home/vagrant
-        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
+        rm -rf $HH/.cache/pip $HH/.ivy2/cache $HH/.bash_history $HH/install/* $HH/Soft
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
         # Zero free space
