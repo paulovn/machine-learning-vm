@@ -44,18 +44,15 @@ subproject.)
 ## Missing bits
 
 The [base ``Vagrantfile``][bv] in this project is self-contained (downloads
-everything needed from public repositories) with two exceptions:
-
-* It installs a Spark package that assumes is locally available (this is done to
-  be able to install a custom Spark compiled from sources). Alternatively it
-  is possible to change that in the Vagrantfile and download and install the 
-  standard binary distribution
-* It installs a GraphFrames package that again must be locally available 
-  (a snapshot version compiled from the [GraphFrames sources][gf] in GitHub)
+everything needed from public repositories) with one exception: it installs 
+a Spark package that assumes is locally available (this is done to be able 
+to install a custom Spark compiled from sources, which is done to use a
+version that uses native math libraries). Alternatively it is possible to 
+change that in the Vagrantfile and download and install the standard binary 
+distribution
 
  [nb]: https://github.com/paulovn/ml-vm-notebook "Spark notebook VM"
  [ex]: https://github.com/paulovn/nbextensions "Jupyter Notebook extensions"
  [vc]: https://app.vagrantup.com/paulovn/boxes/spark-base64
  [bv]: base/Vagrantfile
- [gf]: https://github.com/graphframes/graphframes
  [cl]: ChangeLog.txt

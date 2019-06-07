@@ -1,3 +1,11 @@
+v. 2.2.1
+ * Spark is 2.4.0
+ * Updated Graphframes and Kakfa Streaming packages for 2.4.0
+ * Base OS updated (Python is now 3.6.7, R is 3.5.2)
+ * Added Python package pillow
+ * Notebook management script and Python wrapper updated to name applications
+   with numbers in sequence
+
 v. 2.2.0
  * Based on Ubuntu 18.04
  * Uses Python 3.6
