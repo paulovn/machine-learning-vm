@@ -1,48 +1,59 @@
-*** Makefile.orig	2018-08-28 17:42:59.000000000 +0000
---- Makefile	2018-10-27 12:42:32.638925999 +0000
+*** Makefile.orig	2019-06-10 22:33:19.000000000 +0000
+--- Makefile	2020-01-19 20:57:33.808431823 +0000
 ***************
-*** 142,150 ****
-  JARS+=$(FACET_JAR)              # facet module
-  JARS+=$(SUGGEST_JAR)            # suggest/spell module
-  JARS+=$(EXPRESSIONS_JAR)        # expressions module
+*** 137,149 ****
+  JARS+=$(GROUPING_JAR)           # grouping module
+  JARS+=$(HIGHLIGHTER_JAR)        # highlighter module, needs memory contrib
+  JARS+=$(JOIN_JAR)               # join module
 ! JARS+=$(KUROMOJI_JAR)           # japanese analyzer module
+  #JARS+=$(LUKE_JAR)               # luke
+  JARS+=$(MEMORY_JAR)             # single-document memory index
   JARS+=$(MISC_JAR)               # misc
-! 
-  
-  #
-  # No edits required below
---- 142,150 ----
-  JARS+=$(FACET_JAR)              # facet module
-  JARS+=$(SUGGEST_JAR)            # suggest/spell module
-  JARS+=$(EXPRESSIONS_JAR)        # expressions module
+! JARS+=$(MORFOLOGIK_JAR)         # morfologik analyzer module
+! JARS+=$(NORI_JAR)               # korean analyzer module
+! #JARS+=$(PHONETIC_JAR)           # phonetic analyzer module
+  JARS+=$(QUERIES_JAR)            # regex and other contrib queries
+  JARS+=$(QUERYPARSER_JAR)        # query parsers
+  JARS+=$(SANDBOX_JAR)            # needed by query parser
+--- 137,149 ----
+  JARS+=$(GROUPING_JAR)           # grouping module
+  JARS+=$(HIGHLIGHTER_JAR)        # highlighter module, needs memory contrib
+  JARS+=$(JOIN_JAR)               # join module
 ! #JARS+=$(KUROMOJI_JAR)           # japanese analyzer module
+  #JARS+=$(LUKE_JAR)               # luke
+  JARS+=$(MEMORY_JAR)             # single-document memory index
   JARS+=$(MISC_JAR)               # misc
-! JARS+=$(PHONETIC_JAR)		# phonetic analyzer module
-  
-  #
-  # No edits required below
+! #JARS+=$(MORFOLOGIK_JAR)         # morfologik analyzer module
+! #JARS+=$(NORI_JAR)               # korean analyzer module
+! JARS+=$(PHONETIC_JAR)           # phonetic analyzer module
+  JARS+=$(QUERIES_JAR)            # regex and other contrib queries
+  JARS+=$(QUERYPARSER_JAR)        # query parsers
+  JARS+=$(SANDBOX_JAR)            # needed by query parser
 ***************
-*** 173,184 ****
---- 173,186 ----
-  SUGGEST_JAR=$(LUCENE)/build/suggest/lucene-suggest-$(LUCENE_VER).jar
-  EXPRESSIONS_JAR=$(LUCENE)/build/expressions/lucene-expressions-$(LUCENE_VER).jar
+*** 177,182 ****
+--- 177,183 ----
+  HIGHLIGHTER_JAR=$(LUCENE)/build/highlighter/lucene-highlighter-$(LUCENE_VER).jar
+  JOIN_JAR=$(LUCENE)/build/join/lucene-join-$(LUCENE_VER).jar
   KUROMOJI_JAR=$(LUCENE)/build/analysis/kuromoji/lucene-analyzers-kuromoji-$(LUCENE_VER).jar
 + PHONETIC_JAR=$(LUCENE)/build/analysis/phonetic/lucene-analyzers-phonetic-$(LUCENE_VER).jar
+  LUKE_JAR=$(LUCENE)/build/luke/lucene-luke-$(LUCENE_VER).jar
+  MEMORY_JAR=$(LUCENE)/build/memory/lucene-memory-$(LUCENE_VER).jar
   MISC_JAR=$(LUCENE)/build/misc/lucene-misc-$(LUCENE_VER).jar
-  
-  ANTLR_JAR=$(LUCENE)/expressions/lib/antlr4-runtime-4.5.1-1.jar
+***************
+*** 195,200 ****
+--- 196,202 ----
   ASM_JAR=$(LUCENE)/expressions/lib/asm-5.1.jar
   ASM_COMMONS_JAR=$(LUCENE)/expressions/lib/asm-commons-5.1.jar
   HPPC_JAR=$(LUCENE)/facet/lib/hppc-0.8.1.jar
-+ APACHE_COMMONS_CODECS_JAR=$(LUCENE)/analysis/phonetic/lib/commons-codec-1.10.jar
-  
-  ICUPKG:=$(shell which icupkg)
++ APACHE_COMMONS_CODECS_JAR=$(LUCENE)/analysis/phonetic/lib/commons-codec-1.11.jar
+  LOG4J_API_JAR=$(LUCENE)/luke/lib/log4j-api-2.11.2.jar
+  LOG4J_CORE_JAR=$(LUCENE)/luke/lib/log4j-core-2.11.2.jar
   
 ***************
-*** 260,265 ****
---- 262,270 ----
-  $(KUROMOJI_JAR): $(LUCENE_JAR)
-  	cd $(LUCENE)/analysis/kuromoji; $(ANT) -Dversion=$(LUCENE_VER)
+*** 290,295 ****
+--- 292,300 ----
+  $(MORFOLOGIK_JAR): $(LUCENE_JAR)
+  	cd $(LUCENE)/analysis/morfologik; $(ANT) -Dversion=$(LUCENE_VER)
   
 + $(PHONETIC_JAR): $(LUCENE_JAR)
 + 	cd $(LUCENE)/analysis/phonetic; $(ANT) -Dversion=$(LUCENE_VER)
@@ -51,8 +62,8 @@
   	cd $(LUCENE)/misc; $(ANT) -Dversion=$(LUCENE_VER)
   
 ***************
-*** 294,299 ****
---- 299,305 ----
+*** 336,341 ****
+--- 341,347 ----
   
   GENERATE=$(JCC) $(foreach jar,$(JARS),--jar $(jar)) \
              $(JCCFLAGS) --use_full_names \

@@ -16,7 +16,7 @@ python_version_full = python_version == '3' ? '3.6' : '2.7'
 # Variables defining the installation of Spark
 
 # The version of Spark we will install
-spark_version = '2.4.0'
+spark_version = '2.4.6'
 # [A] Install a locally available custom build
 spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -45,7 +45,7 @@ provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('80.clean'))
 
 # Scala kernel: Toree or SPylon?
-provision_run_toree = false
+provision_run_skernel = 'spylon'
 
 #provision_run_dl = true
 
@@ -73,7 +73,7 @@ Vagrant.configure(2) do |config|
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
     vmconf.vm.box = "bento/ubuntu-18.04"
-    #vmconf.vm.box_version = "2.2.9"
+    vmconf.vm.box_version = "201912.14.0"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
@@ -281,7 +281,6 @@ Vagrant.configure(2) do |config|
     privileged: false, 
     inline: <<-SHELL
       sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev gsfonts
-      #yum -y install openblas-devel hdf5-devel
 
       cd /opt/ipnb/bin
       ./pip install --upgrade pip
@@ -289,35 +288,33 @@ Vagrant.configure(2) do |config|
       # we install this is to avoid InsecurePlatformWarning messages
       ./pip install 'requests[security]'
 
-      ./pip install pyparsing
-      ./pip install matplotlib
+      ./pip install --upgrade pyparsing
+      ./pip install --upgrade matplotlib ipympl
 
-      # Versions fixed as requirement of Spark 2.4.0
+      # Versions fixed as requirement of Spark 2.4.x
       # https://github.com/apache/spark/pull/23657
-      ./pip install pyarrow==0.10.0
-      ./pip install pandas==0.23.4 bottleneck numexpr
+      ./pip install --upgrade pyarrow==0.15.0
+      ./pip install --upgrade pandas==0.25.3 bottleneck numexpr
 
-      ./pip install ipython jupyter notebook jupyterlab ipywidgets
+      ./pip install --upgrade ipython jupyter notebook jupyterlab ipywidgets
 
-      ./pip install pillow
-      ./pip install h5py
-      ./pip install tables
-      ./pip install hdfs
-      ./pip install openpyxl xlrd
+      ./pip install --upgrade pillow
+      ./pip install --upgrade h5py
+      ./pip install --upgrade tables
+      ./pip install --upgrade hdfs
+      ./pip install --upgrade openpyxl xlrd
       #./pip install xlrd
 
-      ./pip install statsmodels
-      ./pip install scikit-learn
-      ./pip install imbalanced-learn
-      ./pip install xgboost
-      ./pip install gensim
-      ./pip install networkx
-      ./pip install seaborn
-      #./pip install mpld3
+      ./pip install --upgrade statsmodels
+      ./pip install --upgrade scikit-learn
+      ./pip install --upgrade imbalanced-learn
+      ./pip install --upgrade xgboost
+      ./pip install --upgrade gensim
+      ./pip install --upgrade networkx
+      ./pip install --upgrade seaborn
+      ./pip install --upgrade pydot graphviz
 
-      ./pip install pydot graphviz
-
-      ./pip install dask
+      ./pip install --upgrade dask
 
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype6-dev
@@ -336,17 +333,12 @@ Vagrant.configure(2) do |config|
 
     mkdir -p Soft
     cd Soft
-    PKG=pylucene-7.5.0
+    PKG=pylucene-8.1.1
     PKGFILE=$PKG-src.tar.gz
     rm -rf $PKG $PKGFILE
     wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
     tar zxvf $PKGFILE
     cd $PKG
-
-    # Patch JCC to make it build a shared JCC version in Linux
-    # (make it identify a modern setuptools)
-    # [already done in pylucene 7.5.0]
-    #patch -p0 < /vagrant/lucene/jcc.patch
 
     # Patch the Makefile to add the phonetic analysis classes to Pylucene
     patch -p0 < /vagrant/lucene/Makefile.patch
@@ -453,11 +445,14 @@ Vagrant.configure(2) do |config|
     # No Spark add-ons installed
     #  * spark-csv is now part of Spark 2.x
     #  * GraphFrames & Kafka Streaming can be declared as packages in
-    #    Spark config and they will be automatically downloaded    # 
+    #    Spark config and they will be automatically downloaded
+    # But we *do* install the Hadoop Brotli codec
     # .........................................
     # Install a local build of the GraphFrames package
-    #vmconf.vm.provision "31.spark.pkg",
-    #type: "file",
+    vmconf.vm.provision "31.spark.pkg",
+    type: "file",
+    source: "buildfiles/extra/brotli-codec-0.1.1.jar",
+    destination: spark_basedir + "/extra/brotli-codec-0.1.1.jar"
     #source: "buildfiles/graphframes/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar",
     #destination: "/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar"
 
@@ -466,7 +461,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "32a.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
-    destination: '/opt/spark/current/conf'
+    destination: spark_basedir + '/current/conf'
 
     # Prepare a configuration for using GraphFrames
     vmconf.vm.provision "32b.spark.cfg.graphframes",
@@ -484,16 +479,21 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vmconf.vm.provision "33.notebook.script",
+    vmconf.vm.provision "33a.notebook.script",
     type: "file",
-    source: "buildfiles/jupyter-notebook-mgr",
+    source: "buildfiles/startup/jupyter-notebook-mgr",
     destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
+
+    vmconf.vm.provision "33b.notebook.wrapper",
+    type: "file",
+    source: "buildfiles/startup/jupyter-notebook-wrapper",
+    destination: "/opt/ipnb/bin/jupyter-notebook-wrapper"
 
     # .........................................
     # Install the Systemd unit file to manage the notebook server
     vmconf.vm.provision "34a.notebook.systemd",
     type: "file",
-    source: "buildfiles/notebook.service",
+    source: "buildfiles/startup/notebook.service",
     destination: "/tmp/notebook.service"
 
     vmconf.vm.provision "34b.notebook.systemd",
@@ -505,13 +505,13 @@ Vagrant.configure(2) do |config|
     # Install the Pyspark script wrapper
     vmconf.vm.provision "35.pyspark.wrapper",
     type: "file",
-    source: "buildfiles/pyspark-ipnb",
+    source: "buildfiles/startup/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
 
     # .........................................
     # Install the Toree Scala/Spark kernel
     # We use a custom-built version compiled from master
-    if (provision_run_toree)
+    if (provision_run_skernel == 'toree')
     vmconf.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
@@ -531,7 +531,7 @@ Vagrant.configure(2) do |config|
       # -- [D] From a locally available file
       pip install /vagrant/toree/$PKG 
     SHELL
-    else
+    elsif (provision_run_skernel == 'spylon')
     vmconf.vm.provision "36.scala.kernel",
     type: "shell",
     privileged: false,
@@ -540,8 +540,20 @@ Vagrant.configure(2) do |config|
       echo "Installing the (Scala) SPylon kernel"
       pip install spylon_kernel
     SHELL
+    else
+    vmconf.vm.provision "36.scala.kernel",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    inline: <<-SHELL
+    SCALA_VERSION=2.12.13
+    ALMOND_VERSION=0.9.1
+    curl -Lo coursier https://git.io/coursier-cli
+    chmod +x coursier
+    ./coursier bootstrap -r jitpack -i user -I user:sh.almond:scala-kernel-api_$SCALA_VERSION:$ALMOND_VERSION  sh.almond:scala-kernel_$SCALA_VERSION:$ALMOND_VERSION -o almond
+     ./almond --install --jupyter-path /--display-name "Scala (2.12)"
+    SHELL
     end
-
 
     # .........................................
     # Install some files for notebooks
@@ -573,19 +585,8 @@ Vagrant.configure(2) do |config|
 
     # .........................................
 
-    # the theanorc file
-    vmconf.vm.provision "50a.theanorc",
-    type: 'file',
-    source: 'buildfiles/theanorc',
-    destination: '/tmp/theanorc'
-
-    vmconf.vm.provision "50b.theanorc",
-    type: 'shell',
-    privileged: true,
-    inline: 'cp -p /tmp/theanorc /etc/theanorc'
-
     if (provision_run_dl)
-      vmconf.vm.provision "61.dl",
+      vmconf.vm.provision "60.dl",
       type: "shell",
       privileged: false,
       keep_color: true,
@@ -631,7 +632,7 @@ Vagrant.configure(2) do |config|
                           x11proto-core-dev x11proto-input-dev x11proto-kb-dev \
                           x11proto-render-dev x11proto-xext-dev xtrans-dev \
                           krb5-multidev libaec-dev libjbig-dev libtiff5-dev \
-                          libvpx-dev
+                          libvpx-dev libx11-doc libxau-dev swig3.0 x11proto-dev
 
         # --- don't do this -- we may remove something needed (because it is used
         # by a program that was compiled, so no dependencies declared)
