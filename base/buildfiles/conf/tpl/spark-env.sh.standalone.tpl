@@ -18,6 +18,9 @@ test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 #SPARK_LOCAL_HOSTNAME=
 #SPARK_PUBLIC_DNS=
 
+# Compatibiliy Setting for PyArrow >= 0.15.0
+ARROW_PRE_0_15_IPC_FORMAT=1
+
 # Set the Python to use
 PYSPARK_PYTHON=/opt/ipnb/bin/python
 # Set Python for Driver -- but only if not set (to allow Jupyter notebook to run)

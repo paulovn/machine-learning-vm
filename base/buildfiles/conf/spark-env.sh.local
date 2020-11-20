@@ -20,8 +20,11 @@ PYSPARK_DRIVER_PYTHON=${PYSPARK_DRIVER_PYTHON:-/opt/ipnb/bin/ipython}
 # Default arguments for job submission
 PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 --executor-cores 2 --executor-memory 1g'
 
+# Compatibiliy Setting for PyArrow >= 0.15.0
+ARROW_PRE_0_15_IPC_FORMAT=1
+
 # ------------------------------------------------------------------------------
-# To be able to use a local GraphFrames JAR in Python, enlarge PYTHONPATH with
+# To be able to use GraphFrames in Python with a local JAR, enlarge PYTHONPATH with
 # the GraphFrames path
-#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.7.0-spark2.4.jar
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.8.0-spark2.4.jar
 # ------------------------------------------------------------------------------

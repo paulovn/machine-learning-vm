@@ -1,3 +1,18 @@
+v. 2.2.2
+ * Spark is 2.4.6
+ * Base OS Updated (R is now 3.6.2)
+ * Updated some Python packages. PyLucene is now 8.1.1
+ * Added package for Brotli codec (to use in Parquet files)
+ * Updated Spark config
+    - Use the optimized version of Hadoop FileOutputCommiter
+    - Packages for Spark 2.4.6
+    - Compatibiliy Setting for PyArrow >= 0.15.0
+ * Refactored management scripts
+    - Start jupyter service automatically at system startup
+    - Wrap Jupyter actual launch to wait until the notebook directory (shared folder)
+      is ready
+
+
 v. 2.2.1
  * Spark is 2.4.0
  * Updated Graphframes and Kakfa Streaming packages for 2.4.0

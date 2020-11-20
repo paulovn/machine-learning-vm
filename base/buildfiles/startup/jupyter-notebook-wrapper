@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# A wrapper script to wait until the notebook directory is available
+# It assumes the directory has been defined in the NOTEBOOK_BASEDIR env variable
+
+num=1
+while test ! -d "$NOTEBOOK_BASEDIR"
+do
+    echo "** $(date -Is): Waiting for dir to became available: $NOTEBOOK_BASEDIR"
+    sleep $num
+    test $num -lt 15 && ((num=num+1))
+done
+
+echo "** $(date -Is): Starting $@ on $NOTEBOOK_BASEDIR"
+LANG=en_US.UTF-8 NOTEBOOK_BASEDIR=$NOTEBOOK_BASEDIR exec $@

@@ -29,7 +29,8 @@ set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
 NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
-NOTEBOOK_SCRIPT=${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}
+NOTEBOOK_SCRIPT="${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}"
+NOTEBOOK_BASEDIR="${NOTEBOOK_BASEDIR:-/home/$NOTEBOOK_USER/IPNB}"
 export LOGDIR=${LOGDIR:-/var/log/ipnb}
 
 id ${NOTEBOOK_USER} >/dev/null 2>/dev/null || { echo "Error: user $NOTEBOOK_USER does not exist"; exit 1; }
@@ -71,8 +72,10 @@ done
 test -f $IDFILE || { echo 0 > $IDFILE; chown $NOTEBOOK_USER.$NOTEBOOK_USER $IDFILE; }
 
 
+    
+
 start() {
-    [ -d /home/$NOTEBOOK_USER/IPNB ] || { log_failure_msg "Error: notebook dir not present"; return 1; } 
+    LOG_FILE=${LOGDIR}/${DAEMON}.out    
     [ -x $EXE_FILE ] || exit $ERROR_PROGRAM_NOT_INSTALLED
     log_success_msg "Starting $DESC (${DAEMON}): "
 
@@ -83,10 +86,10 @@ start() {
         exit 0
     fi
 
-    LOG_FILE=${LOGDIR}/${DAEMON}.out
     echo "************ Start on $(date)" >> ${LOG_FILE}
     chown $NOTEBOOK_USER ${LOG_FILE}
-    runuser $NOTEBOOK_USER -l -s /bin/bash  -c "nohup env LANG=en_US.UTF-8 $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $! ' > $PIDFILE
+    THISDIR=$(dirname "$0")
+    runuser $NOTEBOOK_USER -l -s /bin/bash  -c "nohup env NOTEBOOK_BASEDIR=$NOTEBOOK_BASEDIR $THISDIR/jupyter-notebook-wrapper $NOTEBOOK_SCRIPT >>$LOG_FILE 2>&1 &"' echo $! ' > $PIDFILE
 
     sleep 3
 
