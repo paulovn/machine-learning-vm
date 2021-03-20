@@ -24,7 +24,7 @@ YARN_CONF_DIR=${YARN_CONF_DIR:-/opt/spark/current/conf/hadoop}
 #YARN_OPTS="--conf spark.yarn.historyServer.address={HOSTNAME-SPARK-HS}"
 
 # Compatibiliy Setting for PyArrow >= 0.15.0
-ARROW_PRE_0_15_IPC_FORMAT=1
+#ARROW_PRE_0_15_IPC_FORMAT=1
 
 # Set the Python to use
 PYSPARK_PYTHON=/opt/ipnb/bin/python

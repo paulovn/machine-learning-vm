@@ -1,0 +1,7 @@
+#!/bin/sh
+
+cat <<'EOF'
+
+Base box built by the Bento project by Chef Software
+More information can be found at https://github.com/chef/bento
+EOF

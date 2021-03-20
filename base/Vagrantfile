@@ -7,16 +7,14 @@
 
 vagrant_command = ARGV[0]
 
-# Python version for which we will be creating the notebook environment (2 or 3)
-python_version = '3'
-
-python_version_full = python_version == '3' ? '3.6' : '2.7'
+# Python version for which we will be creating the notebook environment
+python_version_full = '3.8'
 
 # --------------------------------------------------------------------------
 # Variables defining the installation of Spark
 
 # The version of Spark we will install
-spark_version = '2.4.6'
+spark_version = '3.1.1'
 # [A] Install a locally available custom build
 spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -44,8 +42,8 @@ provision_run_scala = (ENV['PROVISION_SCALA'] == '1') || \
 provision_run_clean = (ENV['PROVISION_CLEAN'] == '1') || \
         (vagrant_command == 'provision' && ARGV.include?('80.clean'))
 
-# Scala kernel: Toree or SPylon?
-provision_run_skernel = 'spylon'
+# Scala kernel: Toree, SPylon, almond?
+provision_run_skernel = ''
 
 #provision_run_dl = true
 
@@ -72,8 +70,8 @@ Vagrant.configure(2) do |config|
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vmconf.vm.box = "bento/ubuntu-18.04"
-    vmconf.vm.box_version = "201912.14.0"
+    vmconf.vm.box = "bento/ubuntu-20.04"
+    vmconf.vm.box_version = "202012.23.0"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
@@ -93,7 +91,8 @@ Vagrant.configure(2) do |config|
       # Set the hostname in the provider
       vb.name = vmconf.vm.hostname.to_s
       # Customize the amount of memory on the VM
-      vb.memory = "1024"
+      #vb.memory = "1024"
+      vb.memory = "3072"
       # Display the VirtualBox GUI when booting the machine
       #vb.gui = true
       # A patch for a problem in VirtualBox -- fixed in VB 5.0.28 and 5.1.6
@@ -149,21 +148,15 @@ Vagrant.configure(2) do |config|
      apt-get update -y
      #DEBIAN_FRONTEND=noninteractive apt-get install -y keyboard-configuration
      DEBIAN_FRONTEND=noninteractive apt-get --yes --option Dpkg::Options::="--force-confdef" upgrade
-
-     # Ensure we get past this kernel bug:
-     # https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1699772
-     #echo "Installing latest kernel ..."
-     #apt-get install linux-image-generic -y
-     # we'd need to remove the old kernels afterwards
+     # Install some basic packages + dev libraries to compile R/Python pkgs
+     apt install build-essential
+     #apt install gcc g++ freetype-devel libpng-devel libffi-devel
+     apt install libopenblas-dev
+     # General utility programs
+     apt-get install -y emacs-nox python3-venv graphviz
 
      # Make some subdirectories in the vagrant home dir
-     sudo -u vagrant -i mkdir bin install tmp
-     # Install some basic packages + dev libraries to compile R/Python pkgs
-     # --not needed (many already by default on the base box) --
-     #XXX apt install gcc gcc-c++ freetype-devel libpng-devel libffi-devel
-     #XXX apt install libopenblas-dev
-     # General utility programs
-     apt-get install -y emacs-nox virtualenv
+     sudo -iu vagrant mkdir bin install tmp
     SHELL
 
     # Generate a few locales
@@ -171,28 +164,30 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: true,
     inline: <<-SHELL
-     # customize locales
-     locale-gen "es" "pt" "de_DE.UTF-8"
+    cat <<'ENDFILE' > /var/lib/locales/supported.d/en
+en_US.UTF-8 UTF-8
+ENDFILE
+     locale-gen "en_US.UTF-8" "es_ES.UTF-8" "pt_BR.UTF-8" "de_DE.UTF-8"
      dpkg-reconfigure -f noninteractive locales
     SHELL
 
     # Compile graphviz from source
     # (the Ubuntu package was not built with gts and hence cannot use sfdp)
-    vmconf.vm.provision "03.graphviz",
+    vmconf.vm.provision "03.graphviz-DEPRECATED",
     type: "shell",
-    privileged: true,
+    privileged: false,
     inline: <<-SHELL
-     apt-get install -y libgts-dev libann-dev libgd-dev librsvg2-dev
-     pkg-config --libs gts
-     pkg-config --cflags gts
+     sudo apt-get install -y libgts-dev libann-dev libgd-dev librsvg2-dev
+     sudo pkg-config --libs gts
+     sudo pkg-config --cflags gts
 
-     wget https://graphviz.gitlab.io/pub/graphviz/stable/SOURCES/graphviz.tar.gz
+     wget https://graphviz.gitlab.io/pub/graphviz/stable/SOURCES/graphviz.tar.gz --no-verbose
      tar xzvf graphviz.tar.gz
      cd graphviz-*
      ANN_CFLAGS=-I/usr/include ANN_LIBS=-lann ./configure --with-gts --with-ann
-     make
-     make install
-     apt-get remove -y libgd-dev librsvg2-dev
+     make || exit 1
+     sudo make install
+     sudo apt-get remove -y libgd-dev librsvg2-dev
      cd ..
      rm -rf graphviz*
     SHELL
@@ -201,7 +196,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "10.jdk",
     type: "shell", 
     privileged: true, 
-    inline: "apt-get install -y openjdk-8-jdk-headless"
+    inline: "apt-get install -y openjdk-11-jdk-headless"
 
     # Install R
     vmconf.vm.provision "11.R",
@@ -209,7 +204,7 @@ Vagrant.configure(2) do |config|
     privileged: true, 
     inline: <<-SHELL
      apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-     add-apt-repository "deb https://cran.rediris.es/bin/linux/ubuntu bionic-cran35/"
+     sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
      apt-get update -y
      apt-get install -y r-recommended
      #(another option: r-base-dev)
@@ -218,12 +213,17 @@ Vagrant.configure(2) do |config|
     # Install some R packages & the IR kernel for Jupyter
     vmconf.vm.provision "12.Rpkg",
     type: "shell", 
-    privileged: true, 
+    privileged: true,
     inline: <<-SHELL
-     RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
-     mkdir -p $RDIR
-     echo "Installing R packages: rmarkdown, tidyverse, data.table, caret, neuralnet"
-     apt-get install -y pkg-config libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev libnlopt-dev
+     echo "Installing R packages"
+     #RDIR=$(Rscript -e "for (p in .libPaths()) { if( startsWith(p,'/usr/local')) { cat(p); break; }}")
+     #mkdir -p $RDIR
+     #apt-get install -y pkg-config libpq-dev libcurl4-openssl-dev libzmq5 libmariadb-client-lgpl-dev libxml2-dev libnlopt-dev
+
+     export DEBIAN_FRONTEND=noninteractive
+     PKG="libxml2-dev libssl-dev libcurl4-openssl-dev libsodium-dev"
+     apt-get install -y $PKG
+
      for pkg in "'rmarkdown'" \
                 "'tidyverse'" \
                 "'data.table'" \
@@ -234,16 +234,19 @@ Vagrant.configure(2) do |config|
      done
 
      echo "Installing IRkernel"
-     Rscript -e 'install.packages( c("crayon","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
+     #Rscript -e 'install.packages( c("crayon","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      #Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
-     Rscript -e 'devtools::install_github( "IRkernel/IRkernel" )'
+     #Rscript -e 'devtools::install_github( "IRkernel/IRkernel" )'
+
+     Rscript -e "install.packages('IRkernel',dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
 
      echo "Installing sparklyr"
      sudo apt-get install libcurl4-gnutls-dev
      #Rscript -e 'devtools::install_github("rstudio/sparklyr")'
      Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
 
-     apt-get remove -y libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
+     apt-get remove -y $PKG
+     #libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
     SHELL
 
 
@@ -252,23 +255,22 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "15.python.venv",
     type: "shell", 
     privileged: false,
-    args: [ python_version, python_version_full ],
+    args: [ python_version_full ],
     inline: <<-SHELL
      # Prepare the place
-     sudo rm -rf /opt/ipnb$1
-     sudo mkdir -m 775 /opt/ipnb$1
-     sudo chown vagrant.vagrant /opt/ipnb$1
-     sudo ln -s /opt/ipnb$1 /opt/ipnb
+     sudo rm -rf /opt/ipnb
+     sudo mkdir -m 775 /opt/ipnb
+     sudo chown vagrant.vagrant /opt/ipnb
 
-     sudo apt-get install -y libpython${2}-dev
+     sudo apt-get install -y libpython${1}-dev
 
      # Create a virtualenv
-     virtualenv -p python$1 /opt/ipnb$1 --no-site-packages
+     python$1 -m venv  /opt/ipnb
 
      # Make links for vagrant user
      cd $HOME/bin
-     rm -f python python$2 pip
-     ln -s /opt/ipnb$1/bin/{python,python$2,pip} .
+     rm -f python python$1 pip
+     ln -s /opt/ipnb/bin/{python,python$1,pip} .
     SHELL
 
 
@@ -285,16 +287,16 @@ Vagrant.configure(2) do |config|
       cd /opt/ipnb/bin
       ./pip install --upgrade pip
       ./pip install --upgrade setuptools
+      ./pip install wheel
+
       # we install this is to avoid InsecurePlatformWarning messages
       ./pip install 'requests[security]'
 
       ./pip install --upgrade pyparsing
       ./pip install --upgrade matplotlib ipympl
 
-      # Versions fixed as requirement of Spark 2.4.x
-      # https://github.com/apache/spark/pull/23657
-      ./pip install --upgrade pyarrow==0.15.0
-      ./pip install --upgrade pandas==0.25.3 bottleneck numexpr
+      ./pip install --upgrade pyarrow
+      ./pip install --upgrade pandas bottleneck numexpr
 
       ./pip install --upgrade ipython jupyter notebook jupyterlab ipywidgets
 
@@ -303,15 +305,15 @@ Vagrant.configure(2) do |config|
       ./pip install --upgrade tables
       ./pip install --upgrade hdfs
       ./pip install --upgrade openpyxl xlrd
-      #./pip install xlrd
 
-      ./pip install --upgrade statsmodels
       ./pip install --upgrade scikit-learn
       ./pip install --upgrade imbalanced-learn
       ./pip install --upgrade xgboost
       ./pip install --upgrade gensim
       ./pip install --upgrade networkx
       ./pip install --upgrade seaborn
+      ./pip install --upgrade statsmodels
+      ./pip install --upgrade pystan fbprophet pytz
       ./pip install --upgrade pydot graphviz
 
       ./pip install --upgrade dask
@@ -327,21 +329,20 @@ Vagrant.configure(2) do |config|
     type: "shell",
     keep_color: true,
     privileged: false,
-    args: [ python_version ],
     inline: <<-SHELL
-    VENV=/opt/ipnb$1
+    VENV=/opt/ipnb
 
     mkdir -p Soft
     cd Soft
-    PKG=pylucene-8.1.1
+    PKG=pylucene-8.6.1
     PKGFILE=$PKG-src.tar.gz
     rm -rf $PKG $PKGFILE
-    wget http://apache.rediris.es/lucene/pylucene/$PKGFILE
+    wget --no-verbose http://apache.rediris.es/lucene/pylucene/$PKGFILE
     tar zxvf $PKGFILE
     cd $PKG
 
     # Patch the Makefile to add the phonetic analysis classes to Pylucene
-    patch -p0 < /vagrant/lucene/Makefile.patch
+    patch -p0 < /vagrant/lucene/$PKG.patch
 
     source $VENV/bin/activate
 
@@ -358,7 +359,7 @@ Vagrant.configure(2) do |config|
     sudo apt-get install -y ant
     export PREFIX_PYTHON=$VENV
     export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
-    export PYTHON="${PREFIX_PYTHON}/bin/python$1"
+    export PYTHON="${PREFIX_PYTHON}/bin/python3"
     export "JCC=$PYTHON -m jcc --shared"
     export NUM_FILES=8
     make
@@ -373,12 +374,11 @@ Vagrant.configure(2) do |config|
     type: "shell",
     keep_color: true,
     privileged: false,
-    args: [ python_version ],
     inline: <<-SHELL
       # Install dependencies to generate GEOS Python bindings
       sudo apt-get install -y swig
       # Install GEOS from source
-      V=3.6.3
+      V=3.8.1
       wget http://download.osgeo.org/geos/geos-$V.tar.bz2
       tar xvfj geos-$V.tar.bz2
       cd geos-$V
@@ -443,7 +443,6 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # No Spark add-ons installed
-    #  * spark-csv is now part of Spark 2.x
     #  * GraphFrames & Kafka Streaming can be declared as packages in
     #    Spark config and they will be automatically downloaded
     # But we *do* install the Hadoop Brotli codec
@@ -477,51 +476,101 @@ Vagrant.configure(2) do |config|
       done
     SHELL
 
+    # Upload libfortran3 from Ubuntu 18.04 (to make netlib work on native libs)
+    vmconf.vm.provision "33a.libfortran3",
+    type: "file",
+    source: "buildfiles/libgfortran3.tgz",
+    destination: "/tmp/libgfortran3.tgz"
+
+    vmconf.vm.provision "33b.libfortran3",
+    type: "shell",
+    privileged: true,
+    inline: "cd /; tar xvf /tmp/libgfortran3.tgz"
+
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vmconf.vm.provision "33a.notebook.script",
+    vmconf.vm.provision "40a.notebook.script",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-mgr",
     destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
 
-    vmconf.vm.provision "33b.notebook.wrapper",
+    vmconf.vm.provision "40b.notebook.wrapper",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-wrapper",
     destination: "/opt/ipnb/bin/jupyter-notebook-wrapper"
 
     # .........................................
     # Install the Systemd unit file to manage the notebook server
-    vmconf.vm.provision "34a.notebook.systemd",
+    vmconf.vm.provision "41a.notebook.systemd",
     type: "file",
     source: "buildfiles/startup/notebook.service",
     destination: "/tmp/notebook.service"
 
-    vmconf.vm.provision "34b.notebook.systemd",
+    vmconf.vm.provision "41b.notebook.systemd",
     type: "shell",
     privileged: true,
     inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
 
     # .........................................
     # Install the Pyspark script wrapper
-    vmconf.vm.provision "35.pyspark.wrapper",
+    vmconf.vm.provision "42.pyspark.wrapper",
     type: "file",
     source: "buildfiles/startup/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
 
     # .........................................
-    # Install the Toree Scala/Spark kernel
-    # We use a custom-built version compiled from master
+    # Install some files for notebooks
+
+    # a custom css
+    vmconf.vm.provision "43.notebook.css",
+    type: "file",
+    source: "buildfiles/style/notebook-custom.css",
+    destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
+
+    # the notebook extensions
+    vmconf.vm.provision "44.notebook.ext",
+    type: 'file',
+    source: 'buildfiles/nbextensions',
+    destination: "/opt/ipnb/share/jupyter/nbextensions"
+
+    # a slightly modified Jupyter icon
+    # (so that it's easier to identify browser tabs belonging to the VM)
+    vmconf.vm.provision "45.icon.jupyter",
+    type: "file",
+    source: 'buildfiles/style/jupyter-favicon-custom.ico',
+    destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
+
+    # icons for Pyspark & Scala kernels
+    vmconf.vm.provision "46.icon.kernel",
+    type: "file", 
+    source: 'buildfiles/style/kernel-icons',
+    destination: spark_basedir + '/kernel-icons'
+
+    # .........................................
+    # message of the day
+    vmconf.vm.provision "50a.motd",
+    type: "file",
+    source: 'buildfiles/motd',
+    destination: '/tmp/'
+
+    vmconf.vm.provision "50b.motd",
+    type: "shell", 
+    privileged: true,
+    inline: 'cp -p /tmp/motd/* /etc/update-motd.d; rm -f /etc/update-motd.d/99-bento'
+
+    # .........................................
+    # Install a Scala Jupyter kernel
     if (provision_run_skernel == 'toree')
-    vmconf.vm.provision "36.scala.kernel",
+    vmconf.vm.provision "60.scala.kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
     args: [ spark_version, spark_name, spark_basedir, repo_base ],
     inline: <<-SHELL
-      PKG=toree-0.2.0.dev1.tar.gz
+      PKG=toree-0.4.0
       echo "Installing the (Scala) Toree Spark kernel $PKG"
       # -- [A] From PyPi
-      #pip install toree
+      pip install toree
       # -- [B] From the developer snapshot
       #pip install https://dist.apache.org/repos/dist/dev/incubator/toree/0.2.0/snapshots/dev1/toree-pip/$PKG
       # -- [C] From a local repository
@@ -529,10 +578,10 @@ Vagrant.configure(2) do |config|
       #wget --no-verbose "${4}spark-kernel/$1/$PKG"
       #pip install $PKG
       # -- [D] From a locally available file
-      pip install /vagrant/toree/$PKG 
+      #pip install /vagrant/toree/$PKG 
     SHELL
     elsif (provision_run_skernel == 'spylon')
-    vmconf.vm.provision "36.scala.kernel",
+    vmconf.vm.provision "60.scala.kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -540,68 +589,35 @@ Vagrant.configure(2) do |config|
       echo "Installing the (Scala) SPylon kernel"
       pip install spylon_kernel
     SHELL
-    else
-    vmconf.vm.provision "36.scala.kernel",
+    elsif (provision_run_skernel == 'almond')
+    vmconf.vm.provision "60.scala.kernel",
     type: "shell",
     privileged: false,
     keep_color: true,
     inline: <<-SHELL
-    SCALA_VERSION=2.12.13
-    ALMOND_VERSION=0.9.1
-    curl -Lo coursier https://git.io/coursier-cli
-    chmod +x coursier
-    ./coursier bootstrap -r jitpack -i user -I user:sh.almond:scala-kernel-api_$SCALA_VERSION:$ALMOND_VERSION  sh.almond:scala-kernel_$SCALA_VERSION:$ALMOND_VERSION -o almond
-     ./almond --install --jupyter-path /--display-name "Scala (2.12)"
-    SHELL
+       curl -Lo coursier https://git.io/coursier-cli
+       chmod +x coursier
+       ./coursier launch --fork almond --scala 2.12.13 -- --install
+       rm -f coursier
+     SHELL
     end
 
     # .........................................
-    # Install some files for notebooks
-
-    # a custom css
-    vmconf.vm.provision "40.notebook.css",
-    type: "file",
-    source: "buildfiles/style/notebook-custom.css",
-    destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
-
-    # the notebook extensions
-    vmconf.vm.provision "41.notebook.ext",
-    type: 'file',
-    source: 'buildfiles/nbextensions',
-    destination: "/opt/ipnb#{python_version}/share/jupyter/nbextensions"
-
-    # a slightly modified Jupyter icon
-    # (so that it's easier to identify browser tabs belonging to the VM)
-    vmconf.vm.provision "42.icon.jupyter",
-    type: "file",
-    source: 'buildfiles/style/jupyter-favicon-custom.ico',
-    destination: "/opt/ipnb#{python_version}/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
-
-    # icons for Pyspark & Scala kernels
-    vmconf.vm.provision "43.icon.kernel",
-    type: "file", 
-    source: 'buildfiles/style/kernel-icons',
-    destination: spark_basedir + '/kernel-icons'
-
-    # .........................................
-
     if (provision_run_dl)
-      vmconf.vm.provision "60.dl",
+      vmconf.vm.provision "70.dl",
       type: "shell",
       privileged: false,
       keep_color: true,
-      args: [ python_version ],
       inline: <<-SHELL
-         pip install --upgrade tensorflow
-         pip install --upgrade --no-deps git+git://github.com/Theano/Theano.git
-         pip install --upgrade keras quiver
+         pip install --upgrade tensorflow tensorboard
+         pip install --upgrade pytorch
        SHELL
     end
     
     # .........................................
     # Install Scala
     if (provision_run_scala)
-      vmconf.vm.provision "70.scala",
+      vmconf.vm.provision "71.scala",
       type: "shell",
       privileged: false,
       keep_color: true,
@@ -654,7 +670,8 @@ Vagrant.configure(2) do |config|
         # Remove leftovers
         HH=/home/vagrant
         rm -rf $HH/.cache/pip $HH/.ivy2/cache $HH/.bash_history $HH/install/* $HH/Soft
-        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log
+        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
 
         # Zero free space
         echo "Whiteout root & boot partitions"

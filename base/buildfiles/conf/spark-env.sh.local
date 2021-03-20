@@ -6,25 +6,25 @@
 unset HADOOP_CONF_DIR
 #HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}
 
-# This enables netlib-java to use the optimized BLAS libraries
-# For this to work, the Spark distribution needs to contain the native reference
-# implementation (which binary pre-built packages do not usually include)
-LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libopenblas.so
+# Configuration for the optimized BLAS libraries
+# (the Spark distribution needs to contain the native reference
+# implementation, which binary pre-built packages do not usually include)
+LOPENBLAS_NUM_THREADS=1
 
 # Set the Python to use for executors
 PYSPARK_PYTHON=/opt/ipnb/bin/python
 
-# Set Python for Driver -- but only if not set (to allow Jupyter notebook to run)
+# Set Python for Driver - but only if not set (to allow Jupyter notebook to run)
 PYSPARK_DRIVER_PYTHON=${PYSPARK_DRIVER_PYTHON:-/opt/ipnb/bin/ipython}
 
 # Default arguments for job submission
 PYSPARK_SUBMIT_ARGS='--master local[*] --driver-memory 1536M --num-executors 2 --executor-cores 2 --executor-memory 1g'
 
-# Compatibiliy Setting for PyArrow >= 0.15.0
-ARROW_PRE_0_15_IPC_FORMAT=1
+# For Arrow 2.0.0
+PYARROW_IGNORE_TIMEZONE=1
 
 # ------------------------------------------------------------------------------
 # To be able to use GraphFrames in Python with a local JAR, enlarge PYTHONPATH with
 # the GraphFrames path
-#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.11-0.8.0-spark2.4.jar
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes_2.12-0.8.0-spark3.0.jar
 # ------------------------------------------------------------------------------
