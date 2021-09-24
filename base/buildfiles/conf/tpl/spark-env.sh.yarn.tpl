@@ -14,9 +14,8 @@ localip()
 # Try first eth1, which will usually be the bridged network
 test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 
-#SPARK_LOCAL_HOSTNAME=10.95.228.27
-#SPARK_PUBLIC_DNS=kongoni
-#SPARK_PUBLIC_DNS=10.95.230.226
+#SPARK_LOCAL_HOSTNAME=
+#SPARK_PUBLIC_DNS=
 
 # This is for running in YARN modes
 HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}

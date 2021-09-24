@@ -1,3 +1,9 @@
+v. 3.1.2
+ * Base OS Updated to Ubuntu 20.04
+   - R is now 4.0.3
+   - Python is 3.8.5
+ * Spark is 3.1.2
+
 v. 3.0.0
  * Base OS Updated to Ubuntu 20.04
    - R is now 4.0.3

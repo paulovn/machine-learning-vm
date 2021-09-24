@@ -14,7 +14,7 @@ python_version_full = '3.8'
 # Variables defining the installation of Spark
 
 # The version of Spark we will install
-spark_version = '3.1.1'
+spark_version = '3.1.2'
 # [A] Install a locally available custom build
 spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -90,9 +90,10 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provider :virtualbox do |vb|
       # Set the hostname in the provider
       vb.name = vmconf.vm.hostname.to_s
-      # Customize the amount of memory on the VM
+      # Customize the amount of memory & CPUs for the VM
       #vb.memory = "1024"
-      vb.memory = "3072"
+      vb.memory = "7168"
+      vb.cpus = '2'
       # Display the VirtualBox GUI when booting the machine
       #vb.gui = true
       # A patch for a problem in VirtualBox -- fixed in VB 5.0.28 and 5.1.6
@@ -318,6 +319,8 @@ ENDFILE
 
       ./pip install --upgrade dask
 
+      ./pip install --upgrade cloudpickle
+
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype6-dev
 
@@ -458,12 +461,23 @@ ENDFILE
     # .........................................
     # Install the Spark configuration files for the different modes
     vmconf.vm.provision "32a.spark.cfg",
+    type: "shell",
+    privileged: false,
+    keep_color: true,
+    args: [ spark_basedir ],
+    inline: <<-SHELL
+      cd $1/current/conf
+      mkdir orig
+      mv *.template orig
+    SHELL
+
+    vmconf.vm.provision "32b.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
     destination: spark_basedir + '/current/conf'
 
     # Prepare a configuration for using GraphFrames
-    vmconf.vm.provision "32b.spark.cfg.graphframes",
+    vmconf.vm.provision "32c.spark.cfg",
     type: "shell",
     privileged: false,
     keep_color: true,
@@ -476,16 +490,36 @@ ENDFILE
       done
     SHELL
 
+    # Install icons for Pyspark & Scala kernels
+    vmconf.vm.provision "33.kernel.icons",
+    type: "file", 
+    source: 'buildfiles/style/kernel-icons',
+    destination: spark_basedir + '/kernel-icons'
+
+
+    # .........................................
+
     # Upload libfortran3 from Ubuntu 18.04 (to make netlib work on native libs)
-    vmconf.vm.provision "33a.libfortran3",
+    vmconf.vm.provision "35a.libfortran3",
     type: "file",
     source: "buildfiles/libgfortran3.tgz",
     destination: "/tmp/libgfortran3.tgz"
 
-    vmconf.vm.provision "33b.libfortran3",
+    vmconf.vm.provision "35b.libfortran3",
     type: "shell",
     privileged: true,
     inline: "cd /; tar xvf /tmp/libgfortran3.tgz"
+
+    # Install the Systemd unit file to manage the notebook server
+    vmconf.vm.provision "36a.notebook.systemd",
+    type: "file",
+    source: "buildfiles/startup/notebook.service",
+    destination: "/tmp/notebook.service"
+
+    vmconf.vm.provision "36b.notebook.systemd",
+    type: "shell",
+    privileged: true,
+    inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
 
     # .........................................
     # Install the IPython Spark notebook daemon script
@@ -499,21 +533,8 @@ ENDFILE
     source: "buildfiles/startup/jupyter-notebook-wrapper",
     destination: "/opt/ipnb/bin/jupyter-notebook-wrapper"
 
-    # .........................................
-    # Install the Systemd unit file to manage the notebook server
-    vmconf.vm.provision "41a.notebook.systemd",
-    type: "file",
-    source: "buildfiles/startup/notebook.service",
-    destination: "/tmp/notebook.service"
-
-    vmconf.vm.provision "41b.notebook.systemd",
-    type: "shell",
-    privileged: true,
-    inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
-
-    # .........................................
     # Install the Pyspark script wrapper
-    vmconf.vm.provision "42.pyspark.wrapper",
+    vmconf.vm.provision "41.pyspark.wrapper",
     type: "file",
     source: "buildfiles/startup/pyspark-ipnb",
     destination: "/opt/ipnb/bin/pyspark-ipnb"
@@ -522,29 +543,24 @@ ENDFILE
     # Install some files for notebooks
 
     # a custom css
-    vmconf.vm.provision "43.notebook.css",
+    vmconf.vm.provision "42.notebook.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
 
     # the notebook extensions
-    vmconf.vm.provision "44.notebook.ext",
+    vmconf.vm.provision "43.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: "/opt/ipnb/share/jupyter/nbextensions"
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
-    vmconf.vm.provision "45.icon.jupyter",
+    vmconf.vm.provision "44.icon.jupyter",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
     destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
 
-    # icons for Pyspark & Scala kernels
-    vmconf.vm.provision "46.icon.kernel",
-    type: "file", 
-    source: 'buildfiles/style/kernel-icons',
-    destination: spark_basedir + '/kernel-icons'
 
     # .........................................
     # message of the day
@@ -609,8 +625,8 @@ ENDFILE
       privileged: false,
       keep_color: true,
       inline: <<-SHELL
-         pip install --upgrade tensorflow tensorboard
-         pip install --upgrade pytorch
+         pip install --upgrade tensorflow-cpu tensorboard
+         pip install --upgrade torch torchvision
        SHELL
     end
     
@@ -670,7 +686,7 @@ ENDFILE
         # Remove leftovers
         HH=/home/vagrant
         rm -rf $HH/.cache/pip $HH/.ivy2/cache $HH/.bash_history $HH/install/* $HH/Soft
-        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log $HH/tmp/*
         rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
 
         # Zero free space
