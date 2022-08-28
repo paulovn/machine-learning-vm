@@ -14,9 +14,8 @@ localip()
 # Try first eth1, which will usually be the bridged network
 test "$SPARK_LOCAL_IP" || SPARK_LOCAL_IP=$(localip eth1 eth0)
 
-#SPARK_LOCAL_HOSTNAME=10.95.228.27
-#SPARK_PUBLIC_DNS=kongoni
-#SPARK_PUBLIC_DNS=10.95.230.226
+#SPARK_LOCAL_HOSTNAME=
+#SPARK_PUBLIC_DNS=
 
 # This is for running in YARN modes
 HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/opt/spark/current/conf/hadoop}
@@ -24,7 +23,7 @@ YARN_CONF_DIR=${YARN_CONF_DIR:-/opt/spark/current/conf/hadoop}
 #YARN_OPTS="--conf spark.yarn.historyServer.address={HOSTNAME-SPARK-HS}"
 
 # Compatibiliy Setting for PyArrow >= 0.15.0
-ARROW_PRE_0_15_IPC_FORMAT=1
+#ARROW_PRE_0_15_IPC_FORMAT=1
 
 # Set the Python to use
 PYSPARK_PYTHON=/opt/ipnb/bin/python

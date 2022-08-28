@@ -1,0 +1,10 @@
+#!/bin/sh
+
+VENV="/opt/ipnb"
+V=`$VENV/bin/python --version`
+
+cat <<EOF
+$V virtualenv with data processing and Machine Learning packages
+available at $VENV
+
+EOF
