@@ -17,11 +17,8 @@ vm_cpus = '1'
 # --------------------------------------------------------------------------
 # Some variables that affect Vagrant execution
 # Check the command requested -- if ssh we'll change the login user
-vagrant_command = ARGV[0]
 
-# Conditionally activate some provision sections
-provision_run_clean  = ENV['PROVISION_CLEAN'] == '1' || \
-        (vagrant_command == 'provision' && ARGV.include?('80.clean'))
+vagrant_command = ARGV[0]
 
 
 # --------------------------------------------------------------------------
@@ -37,11 +34,11 @@ Vagrant.configure(2) do |config|
   config.vm.define "vm-ml-nb64" do |vgrsimple|
 
     # The base box we are using. As fetched from ATLAS
-    vgrsimple.vm.box_version = "= 3.0.0"
+    vgrsimple.vm.box_version = "= 3.1.2"
     vgrsimple.vm.box = "paulovn/spark-base64"
 
     # Alternative place: local box
-    vgrsimple.vm.box_url = "file:///almacen/VM/VagrantBox/spark-base64-LOCAL.json"
+    vgrsimple.vm.box_url = "file:///almacen/VM/Export/VagrantBox/spark-base64-LOCAL.json"
 
     # Disable automatic box update checking. If you disable this, then
     # boxes will only be checked for updates when the user runs
@@ -95,7 +92,16 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Create the user to run Spark jobs (esp. notebook processes)
-    vgrsimple.vm.provision "01.remove-spark",
+    vgrsimple.vm.provision "01.base",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
+      echo "Updating packages ..."
+      apt-get update -y
+      DEBIAN_FRONTEND=noninteractive apt-get --yes --option Dpkg::Options::="--force-confdef" upgrade
+    SHELL
+
+    vgrsimple.vm.provision "02.remove-spark",
     type: "shell", 
     privileged: true,
     inline: <<-SHELL
@@ -103,14 +109,14 @@ Vagrant.configure(2) do |config|
       rm -f /usr/local/lib/R/library/SparkR
     SHELL
 
-    vgrsimple.vm.provision "02.remove-jdk",
+    vgrsimple.vm.provision "03.remove-jdk",
     type: "shell", 
     privileged: true,
     inline: <<-SHELL
       apt-get remove -y openjdk-11-jdk-headless
     SHELL
     
-    vgrsimple.vm.provision "03.clean-virtualenv",
+    vgrsimple.vm.provision "04.clean-virtualenv",
     type: "shell", 
     privileged: false,
     inline: <<-SHELL
@@ -118,54 +124,69 @@ Vagrant.configure(2) do |config|
       rm -f /opt/ipnb/bin/pyspark-ipnb
     SHELL
 
-    if (provision_run_clean)
-      vgrsimple.vm.provision "80.clean",
-      type: "shell",
-      privileged: true,
-      inline: <<-SHELL
-        echo "Cleaning temporal & installation files"
-        apt-get autoclean -y
-        apt-get clean -y
+    vgrsimple.vm.provision "05.update-packages",
+    type: "shell",
+    privileged: false,
+    inline: <<-SHELL
+      pip install --upgrade pip
+      pip uninstall -y toree xgboost
+      pip install --upgrade Cython
+      pip install --upgrade numpy scipy pandas matplotlib ipympl
+      pip install --upgrade ipython jupyter notebook jupyterlab ipywidgets
+      pip install --upgrade openpyxl xlrd
+      pip install --upgrade seaborn scikit-learn statsmodels
+      pip install --upgrade fbprophet
+      pip install --upgrade pydot graphviz
+    SHELL
 
-        # Remove bash history for root
-        unset HISTFILE
-        rm -f /root/.bash_history
+    vgrsimple.vm.provision "80.clean",
+    run: "never",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
+      echo "** Cleaning installation files"
+      apt-get autoclean -y
+      apt-get clean -y
 
-        # Cleanup log files
-        echo "Removing logfiles"
-        find /var/log -type f | while read f; do echo -ne '' > $f; done;
+      # Cleanup log files
+      echo "** Removing logfiles"
+      find /var/log -type f | while read f; do echo -ne '' > $f; done;
 
-        # Remove all temporal files
-        rm -rf /tmp/* /var/tmp/*
+      # Remove bash history for root
+      unset HISTFILE
+      rm -f /root/.bash_history
 
-        # Remove leftovers
-        HH=/home/vagrant
-        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
-        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log
-        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
+      # Remove leftovers for vagrant user
+      HH=/home/vagrant
+      rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
+      rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log $HH/tmp/*
+      rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
 
-        # Zero free space
-        echo "Whiteout root & boot partitions"
-        for fs in / /boot/
-        do
-           count=$(df --sync -kP / | tail -n1  | awk -F ' ' '{print $4}') 
-           let count--
-           dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
-           rm ${fs}whitespace;
-        done
-        sync
+      # Remove all temporal files
+      echo "** Cleaning temporal files"
+      rm -rf /tmp/* /var/tmp/*
 
-        # Zero the swap space
-        swappart=$(cat /proc/swaps | tail -n1 | awk -F ' ' '{print $1}')
-        if [ "$swappart" != "" ]; then
-          swapoff $swappart;
-          dd if=/dev/zero of=$swappart;
-          mkswap $swappart;
-          swapon $swappart;
-        fi
+      # Zero free space
+      echo "** Whiteout root & boot partitions"
+      for fs in / /boot/
+      do
+         count=$(df --sync -kP / | tail -n1  | awk -F ' ' '{print $4}')
+         let count--
+         dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
+         rm ${fs}whitespace;
+      done
+      sync
 
-      SHELL
-    end
+      # Zero the swap space
+      swappart=$(cat /proc/swaps | tail -n1 | awk -F ' ' '{print $1}')
+      if [ "$swappart" != "" ]; then
+        swapoff $swappart;
+        dd if=/dev/zero of=$swappart;
+        mkswap $swappart;
+        swapon $swappart;
+      fi
+
+    SHELL
 
   end # config.vm.define
 
