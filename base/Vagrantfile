@@ -8,17 +8,17 @@
 vagrant_command = ARGV[0]
 
 # Python version for which we will be creating the notebook environment
-python_version_full = '3.8'
+python_version_full = '3.10'
 
 # --------------------------------------------------------------------------
 # Variables defining the installation of Spark
 
 # The version of Spark we will install
-spark_version = '3.1.2'
+spark_version = '3.3.2'
 # [A] Install a locally available custom build
-spark_name = 'spark-' + spark_version + '-bin-custom'
+#spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
-#spark_name = 'spark-' + spark_version + '-bin-hadoop2.7'
+spark_name = 'spark-' + spark_version + '-bin-hadoop3'
 
 # The place where Spark will be deployed inside the local machine
 # There is usually no need to change this
@@ -26,7 +26,7 @@ spark_basedir = '/opt/spark'
 
 # A local artifact repository where some custom-built files might be kept
 # Currently not used
-repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
+#repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
 
 # --------------------------------------------------------------------------
 # Some variables that affect Vagrant execution
@@ -37,7 +37,7 @@ vagrant_command = ARGV[0]
 # Scala kernel: Toree, SPylon, almond?
 provision_run_skernel = ''
 
-#provision_run_dl = true
+#provision_run_dl= true
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -62,8 +62,8 @@ Vagrant.configure(2) do |config|
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vmconf.vm.box = "bento/ubuntu-20.04"
-    vmconf.vm.box_version = "202112.19.0"
+    vmconf.vm.box = "bento/ubuntu-22.04"
+    vmconf.vm.box_version = "202212.11.0"
     #vmconf.vm.box_url = "file:///almacen/VM/Export/VagrantBox/spark-base64-3.1.2.box"
 
     # Disable automatic box update checking. If you disable this, then
@@ -151,6 +151,9 @@ Vagrant.configure(2) do |config|
 
      # Make some subdirectories in the vagrant home dir
      sudo -iu vagrant mkdir bin install tmp
+
+     # We don't use this
+     systemctl disable ModemManager
     SHELL
 
     # Generate a few locales
@@ -158,56 +161,32 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: true,
     inline: <<-SHELL
-    cat <<'ENDFILE' > /var/lib/locales/supported.d/en
-en_US.UTF-8 UTF-8
-ENDFILE
      locale-gen "en_US.UTF-8" "es_ES.UTF-8" "pt_BR.UTF-8" "de_DE.UTF-8"
      dpkg-reconfigure -f noninteractive locales
     SHELL
 
-    # Compile graphviz from source
-    # (the old Ubuntu package was not built with gts and hence could not use sfdp)
-    vmconf.vm.provision "03.graphviz-DEPRECATED",
-    type: "shell",
-    run: "never",
-    privileged: false,
-    inline: <<-SHELL
-     sudo apt-get install -y libgts-dev libann-dev libgd-dev librsvg2-dev
-     sudo pkg-config --libs gts
-     sudo pkg-config --cflags gts
-
-     wget https://graphviz.gitlab.io/pub/graphviz/stable/SOURCES/graphviz.tar.gz --no-verbose
-     tar xzvf graphviz.tar.gz
-     cd graphviz-*
-     ANN_CFLAGS=-I/usr/include ANN_LIBS=-lann ./configure --with-gts --with-ann
-     make || exit 1
-     sudo make install
-     sudo apt-get remove -y libgd-dev librsvg2-dev
-     cd ..
-     rm -rf graphviz*
-    SHELL
-
     # .........................................
     vmconf.vm.provision "10.jdk",
-    type: "shell", 
+    type: "shell",
     privileged: true, 
     inline: "apt-get install -y openjdk-11-jdk-headless"
 
     # Install R
     vmconf.vm.provision "11.R",
-    type: "shell", 
+    type: "shell",
     privileged: true, 
     inline: <<-SHELL
-     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-     sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
+     apt install --no-install-recommends software-properties-common dirmngr
+     wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | sudo tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+     add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
      apt-get update -y
      apt-get install -y r-recommended
      #(another option: r-base-dev)
     SHELL
 
-    # Install some R packages & the IR kernel for Jupyter
+    # Install some R packages
     vmconf.vm.provision "12.Rpkg",
-    type: "shell", 
+    type: "shell",
     privileged: true,
     inline: <<-SHELL
      echo "Installing R packages"
@@ -228,36 +207,45 @@ ENDFILE
          Rscript -e "install.packages(c($pkg),dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
      done
 
+     apt-get remove -y $PKG
+     #libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
+    SHELL
+
+    # Install the IR kernel for Jupyter
+    vmconf.vm.provision "13.IRkernel",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
      echo "Installing IRkernel"
+     Rscript -e "install.packages('IRkernel',dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
+
      #Rscript -e 'install.packages( c("crayon","devtools"),repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
      #Rscript -e 'devtools::install_github( paste0("IRkernel/",c("repr","IRdisplay","IRkernel")) )'
      #Rscript -e 'devtools::install_github( "IRkernel/IRkernel" )'
 
-     Rscript -e "install.packages('IRkernel',dependencies=TRUE,repos=c('http://ftp.cixug.es/CRAN/','http://cran.es.r-project.org/'),quiet=FALSE)"
-
      echo "Installing sparklyr"
      sudo apt-get install libcurl4-gnutls-dev
-     #Rscript -e 'devtools::install_github("rstudio/sparklyr")'
      Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
-
-     apt-get remove -y $PKG
-     #libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
+     apt-get remove -y libcurl4-gnutls-dev
+     #Rscript -e 'devtools::install_github("rstudio/sparklyr")'
     SHELL
 
 
     # .........................................
     # Create a Python virtualenv and install wrappers to point there
     vmconf.vm.provision "15.python.venv",
-    type: "shell", 
+    type: "shell",
     privileged: false,
     args: [ python_version_full ],
     inline: <<-SHELL
+     export DEBIAN_FRONTEND=noninteractive
+
+     sudo apt-get install -y libpython${1}-dev
+
      # Prepare the place
      sudo rm -rf /opt/ipnb
      sudo mkdir -m 775 /opt/ipnb
      sudo chown vagrant.vagrant /opt/ipnb
-
-     sudo apt-get install -y libpython${1}-dev
 
      # Create a virtualenv
      python$1 -m venv  /opt/ipnb
@@ -273,53 +261,52 @@ ENDFILE
     # In the virtualenv, install the Python packages to use in the Notebooks
     # Plus a few ML-related more
     vmconf.vm.provision "16.python.pkg",
-    type: "shell", 
+    type: "shell",
     keep_color: true,
-    privileged: false, 
+    privileged: false,
     inline: <<-SHELL
       sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev gsfonts
 
-      cd /opt/ipnb/bin
-      ./pip install --upgrade pip
-      ./pip install --upgrade setuptools
-      ./pip install wheel
+      source /opt/ipnb/bin/activate
+      pip install --upgrade pip
+      pip install --upgrade setuptools
+      pip install wheel
 
-      # we install this is to avoid InsecurePlatformWarning messages
-      ./pip install 'requests[security]'
+      # we install with options to avoid InsecurePlatformWarning messages
+      pip install 'requests[security]'
 
-      ./pip install --upgrade pyparsing
-      ./pip install --upgrade matplotlib ipympl
+      pip install --upgrade pillow
+      pip install --upgrade h5py
+      pip install --upgrade tables
+      pip install --upgrade hdfs
+      pip install --upgrade openpyxl xlrd
 
-      ./pip install --upgrade pyarrow
-      ./pip install --upgrade pandas bottleneck numexpr
+      pip install --upgrade pyarrow
+      pip install --upgrade pyparsing matplotlib
+      pip install --upgrade pandas bottleneck numexpr
 
-      ./pip install --upgrade ipython jupyter notebook jupyterlab ipywidgets
+      pip install --upgrade pydot graphviz
 
-      ./pip install --upgrade pillow
-      ./pip install --upgrade h5py
-      ./pip install --upgrade tables
-      ./pip install --upgrade hdfs
-      ./pip install --upgrade openpyxl xlrd
+      pip install --upgrade scikit-learn
+      pip install --upgrade imbalanced-learn
+      pip install --upgrade xgboost
+      pip install --upgrade gensim
+      pip install --upgrade networkx
+      pip install --upgrade seaborn
+      pip install --upgrade statsmodels
+      pip install --upgrade pystan prophet pytz
 
-      ./pip install --upgrade scikit-learn
-      ./pip install --upgrade imbalanced-learn
-      ./pip install --upgrade xgboost
-      ./pip install --upgrade gensim
-      ./pip install --upgrade networkx
-      ./pip install --upgrade seaborn
-      ./pip install --upgrade statsmodels
-      ./pip install --upgrade pystan fbprophet pytz
-      ./pip install --upgrade pydot graphviz
+      pip install --upgrade cloudpickle
+      pip install --upgrade dask
 
-      ./pip install --upgrade dask
-
-      ./pip install --upgrade cloudpickle
+      # https://github.com/ipython-contrib/jupyter_contrib_nbextensions/issues/1628
+      pip install --upgrade ipython jupyter-console nbconvert notebook "nbclassic<0.5"
+      pip install --upgrade widgetsnbextension ipywidgets ipympl
+      pip install --upgrade jupyter_nbextensions_configurator
 
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype6-dev
 
-      # Enable ipywidgets
-      ./jupyter nbextension enable --py widgetsnbextension --sys-prefix
     SHELL
 
     vmconf.vm.provision "17.pylucene",
@@ -331,7 +318,7 @@ ENDFILE
 
     mkdir -p Soft
     cd Soft
-    PKG=pylucene-8.8.1
+    PKG=pylucene-9.4.1
     PKGFILE=$PKG-src.tar.gz
     rm -rf $PKG $PKGFILE
     wget --no-verbose http://apache.rediris.es/lucene/pylucene/$PKGFILE || exit 1
@@ -339,17 +326,14 @@ ENDFILE
     cd $PKG
 
     # Patch the Makefile to add the phonetic analysis classes to Pylucene
-    patch -p0 < /vagrant/lucene/$PKG.patch
+    patch -p0 < /vagrant/lucene/$PKG.patch || exit 1
 
     source $VENV/bin/activate
 
     # Build JCC
     cd jcc
     export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
-    #python setup.py bdist
-    #python setup.py install
-    python setup.py bdist_egg
-    $VENV/bin/easy_install dist/*.egg
+    python setup.py install
     cd ..
 
     # build pylucene
@@ -360,10 +344,7 @@ ENDFILE
     export "JCC=$PYTHON -m jcc --shared"
     export NUM_FILES=8
     make
-    make bdist
-
-    # install
-    $VENV/bin/easy_install dist/*.egg
+    make install
 
     SHELL
 
@@ -372,34 +353,14 @@ ENDFILE
     keep_color: true,
     privileged: false,
     inline: <<-SHELL
-      # Install dependencies to generate GEOS Python bindings
-      sudo apt-get install -y swig
-      # Install GEOS from source
-      V=3.8.1
-      wget http://download.osgeo.org/geos/geos-$V.tar.bz2
-      tar xvfj geos-$V.tar.bz2
-      cd geos-$V
-      PYTHON=/usr/bin/python3 ./configure --enable-python
-      ./configure
-      make
-      sudo make install
-      cd ..
-      rm -rf geos-${V}*
-      # Install other Cartopy dependencies, and the package
-      sudo apt-get install -y libproj-dev
-      pip install cython
+      sudo apt-get -y install libgeos-dev
       pip install cartopy
-      # [Note: cartopy does not install with pip 19.0, it needs pip 18.1
-      # see https://github.com/pypa/pip/issues/6163]
-      # Remove stuff we do not need for runtime
-      pip uninstall -y cython
-      sudo apt-get remove -y swig
+      sudo apt-get -y remove libgeos-dev
     SHELL
 
     # .........................................
     # Install a pre-built Spark
-    # We can either install a version we download from a Spark website mirror, or
-    # a locally built custom version
+
     vmconf.vm.provision "30.spark",
     type: "shell",
     privileged: false,
@@ -414,7 +375,7 @@ ENDFILE
            file="/vagrant/spark/$2.tgz";;
         *) echo "Downloading $2.tgz"
            cd install
-           wget --no-verbose "http://apache.rediris.es/spark/spark-$1/$2.tgz"
+           wget --no-verbose "http://dlcdn.apache.org/spark/spark-$1/$2.tgz" || exit 1
            file=$2.tgz;;
       esac
       tar zxvf "$file" -C "$3"
@@ -439,21 +400,22 @@ ENDFILE
     SHELL
 
     # .........................................
-    # No Spark add-ons installed
-    #  * GraphFrames & Kafka Streaming can be declared as packages in
-    #    Spark config and they will be automatically downloaded
-    # But we *do* install the Hadoop Brotli codec
+    # Spark add-ons to install
+    #  * GraphFrames snapshot
+    #  * Hadoop Brotli codec
+    # (Kafka Structured Streaming can be declared as package in
+    # Spark config and it will be automatically downloaded)
     # .........................................
-    # Install a local build of the GraphFrames package
+    # Install the brotli codec
     vmconf.vm.provision "31.spark.pkg",
     type: "file",
-    source: "buildfiles/extra/brotli-codec-0.1.1.jar",
-    destination: spark_basedir + "/extra/brotli-codec-0.1.1.jar"
-    #source: "buildfiles/graphframes/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar",
-    #destination: "/opt/spark/current/jars/extra/graphframes_2.11-0.6.0-SNAPSHOT-spark2.3.jar"
+    source: "buildfiles/extra",
+    destination: spark_basedir + "/" + spark_name + "/jars/extra"
 
     # .........................................
     # Install the Spark configuration files for the different modes
+
+    # Move all system config to "orig"
     vmconf.vm.provision "32a.spark.cfg",
     type: "shell",
     privileged: false,
@@ -465,6 +427,7 @@ ENDFILE
       mv *.template orig
     SHELL
 
+    # Copy local config
     vmconf.vm.provision "32b.spark.cfg",
     type: "file",
     source: 'buildfiles/conf',
@@ -480,7 +443,7 @@ ENDFILE
       cd $1/current/conf
       for f in spark-env.sh spark-defaults.conf
       do
-         sed 's|#GFP#||g' ${f}.local > ${f}.local.graphframes
+         sed 's|#GFL#||g' ${f}.local > ${f}.local.graphframes
       done
     SHELL
 
@@ -490,19 +453,7 @@ ENDFILE
     source: 'buildfiles/style/kernel-icons',
     destination: spark_basedir + '/kernel-icons'
 
-
     # .........................................
-
-    # Upload libfortran3 from Ubuntu 18.04 (to make netlib work on native libs)
-    vmconf.vm.provision "35a.libfortran3",
-    type: "file",
-    source: "buildfiles/libgfortran3.tgz",
-    destination: "/tmp/libgfortran3.tgz"
-
-    vmconf.vm.provision "35b.libfortran3",
-    type: "shell",
-    privileged: true,
-    inline: "cd /; tar xvf /tmp/libgfortran3.tgz"
 
     # Install the Systemd unit file to manage the notebook server
     vmconf.vm.provision "36a.notebook.systemd",
@@ -542,11 +493,47 @@ ENDFILE
     source: "buildfiles/style/notebook-custom.css",
     destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
 
-    # the notebook extensions
-    vmconf.vm.provision "43.notebook.ext",
+    # install notebook extensions
+    vmconf.vm.provision "43a.notebook.ext",
+    type: "shell",
+    keep_color: true,
+    privileged: false, 
+    inline: <<-SHELL
+      source /opt/ipnb/bin/activate
+
+      # Install & enable ipywidgets extension
+      jupyter nbextension install --py widgetsnbextension --sys-prefix
+      jupyter nbextension enable --py widgetsnbextension --sys-prefix
+
+      # Install the extensions configurator and enable it
+      jupyter nbextensions_configurator enable --sys-prefix
+
+      #jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix
+      #jupyter nbextension enable --py jupyter_nbextensions_configurator --sys-prefix
+
+      # Install the contrib nbextensions
+      #jupyter contrib nbextension install --sys-prefix
+    SHELL
+
+    # add some custom notebook extensions
+    # (including a patch for toc2)
+    vmconf.vm.provision "43b.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: "/opt/ipnb/share/jupyter/nbextensions"
+
+    # enable desired extensions
+    vmconf.vm.provision "43c.notebook.ext",
+    type: "shell",
+    keep_color: true,
+    privileged: false,
+    inline: <<-SHELL
+      source /opt/ipnb/bin/activate
+      for ext in toc2 toggle-headers search-replace python-markdown
+      do
+        jupyter nbextension enable ${ext}/main --sys-prefix
+      done
+    SHELL
 
     # a slightly modified Jupyter icon
     # (so that it's easier to identify browser tabs belonging to the VM)
@@ -564,7 +551,7 @@ ENDFILE
     destination: '/tmp/'
 
     vmconf.vm.provision "50b.motd",
-    type: "shell", 
+    type: "shell",
     privileged: true,
     inline: 'cp -p /tmp/motd/* /etc/update-motd.d; rm -f /etc/update-motd.d/99-bento'
 
@@ -647,7 +634,13 @@ ENDFILE
       run: "never",
       privileged: true,
       inline: <<-SHELL
-        echo "Cleaning temporal & installation files"
+        echo "*** Removing snaps"
+        for s in lxd core20 snapd
+        do
+            snap remove $s
+        done
+
+        echo "*** Cleaning temporal & installation files"
         apt-get autoclean -y
         apt-get clean -y
         apt-get remove -y libx11-dev ibgdk-pixbuf2.0-dev libice-dev libxpm-dev \
@@ -658,51 +651,58 @@ ENDFILE
                           krb5-multidev libaec-dev libjbig-dev libtiff5-dev \
                           libvpx-dev libx11-doc libxau-dev swig3.0 x11proto-dev
 
-        # --- don't do this -- we may remove something needed (because it is used
-        # by a program that was compiled, so no dependencies declared)
+        # --- don't do this -- we may remove something needed (because it is
+        # used by a program that was compiled, so no dependencies declared)
         #apt-get autoremove -y --purge
-        # this will need to be done by hand
+
+        #this will need to be done by hand
         #dpkg --purge linux-image-4.4.0-81-generic linux-image-extra-4.4.0-81-generic
 
         # Remove bash history for root
         unset HISTFILE
         rm -f /root/.bash_history
 
+        # Remove resume information
+        echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
+        apt purge mdadm
+
         # Cleanup log files
-        echo "Removing logfiles"
+        echo "*** Removing logfiles"
         find /var/log -type f | while read f; do echo -ne '' > $f; done;
+        journalctl --rotate --vacuum-size=10K
 
         # Remove all temporal files
         rm -rf /tmp/* /var/tmp/*
 
         # Remove leftovers
         HH=/home/vagrant
-        rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
-        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log $HH/tmp/*
+        rm -rf $HH/.cache/pip $HH/.gradle $HH/.bash_history $HH/*.log
         rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
-
-        # Zero free space
-        echo "Whiteout root & boot partitions"
-        for fs in / /boot/
-        do
-           count=$(df --sync -kP / | tail -n1  | awk -F ' ' '{print $4}') 
-           let count--
-           dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
-           rm ${fs}whitespace;
-        done
-        sync
+        rm -rf $HH/install/* $HH/Soft $HH/tmp/*
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
         # Zero the swap space
-        swappart=$(cat /proc/swaps | tail -n1 | awk -F ' ' '{print $1}')
+        swappart=$(cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}')
         if [ "$swappart" != "" ]; then
+          echo "*** Whiteout swap space: $swappart"
           swapoff $swappart;
           dd if=/dev/zero of=$swappart;
           mkswap $swappart;
           swapon $swappart;
         fi
 
-      SHELL
+        # Zero disk free space
+        echo "*** Whiteout root & boot partitions"
+        for fs in / /boot/
+        do
+           count=$(df --sync -kP $fs | tail -n1 | awk -F ' ' '{print $4}')
+           let count--
+           dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
+           rm -f ${fs}whitespace;
+        done
+        sync
 
+      SHELL
 
   end
 

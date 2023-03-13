@@ -48,11 +48,11 @@ spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2
 # [1] declare the package so that it is downloaded automatically together with
 # its dependencies. Of course, it needs to be available in the public repository
 
-#GFP#spark.jars.packages=graphframes:graphframes:0.8.1-spark3.0-s_2.12
+#GFP#spark.jars.packages=graphframes:graphframes:0.8.2-spark3.2-s_2.12
 
 # [2] point to a locally downloaded copy, and declare also its dependencies
 
-#GFL#spark.jars=/opt/spark/current/jars/extra/graphframes_2.12-0.8.1-spark3.0.jar
+#GFL#spark.jars=/opt/spark/current/jars/extra/graphframes-assembly-0.8.3-SNAPSHOT-spark3.3.jar
 #GFL#spark.jars.packages=org.slf4j:slf4j-api:1.7.25
 
 # ... and for [2], to use it in Python, don't forget to add it in spark-env.sh
@@ -64,8 +64,8 @@ spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2
 # [1] "Classic" streaming. Note that for Spark 3.x the only version
 # available is for Kafka 0.10 protocol, and it does not have a Python API
 
-#KFC#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-10_2.12:3.1.2
+#KFC#spark.jars.packages=org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.2
 
 # [2] Structured streaming
 
-#KFS#spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2
+#KFS#spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.2
