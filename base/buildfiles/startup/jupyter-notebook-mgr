@@ -104,7 +104,7 @@ start() {
 stop() {
     log_success_msg "Stopping $DESC (${DAEMON}): "
     # start-stop-daemon uses command name, which has a 15-char limit
-    killproc -p $PIDFILE jupyter-noteboo
+    killproc -p $PIDFILE jupyter-notebook
     RETVAL=$?
 
     [ $RETVAL -eq $RETVAL_SUCCESS ] && rm -f $LOCKFILE $PIDFILE

@@ -26,5 +26,5 @@ PYARROW_IGNORE_TIMEZONE=1
 # ------------------------------------------------------------------------------
 # To be able to use GraphFrames in Python when using a local JAR, enlarge
 # PYTHONPATH with the GraphFrames path
-#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes-assembly-0.8.3-SNAPSHOT-spark3.3.jar
+#GFL#PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}/opt/spark/current/jars/extra/graphframes-assembly-0.8.4-SNAPSHOT-spark3.4.jar
 # ------------------------------------------------------------------------------
