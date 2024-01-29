@@ -34,7 +34,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "vm-ml-nb64" do |vgrsimple|
 
     # The base box we are using. As fetched from ATLAS
-    vgrsimple.vm.box_version = "= 3.1.2"
+    vgrsimple.vm.box_version = "= 3.3.0"
     vgrsimple.vm.box = "paulovn/spark-base64"
 
     # Alternative place: local box
@@ -91,7 +91,7 @@ Vagrant.configure(2) do |config|
     # Provisioning: install Spark configuration files and startup scripts
 
     # .........................................
-    # Create the user to run Spark jobs (esp. notebook processes)
+    # Update packages
     vgrsimple.vm.provision "01.base",
     type: "shell",
     privileged: true,
@@ -130,63 +130,87 @@ Vagrant.configure(2) do |config|
     inline: <<-SHELL
       pip install --upgrade pip
       pip uninstall -y toree xgboost
+
+      pip install --upgrade jupyter-client==7.4.4 tornado==6.2
+      pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
+      (cd /opt/ipnb/lib/python3.*/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
+      pip install --upgrade widgetsnbextension ipywidgets ipympl
+
       pip install --upgrade Cython
       pip install --upgrade numpy scipy pandas matplotlib ipympl
-      pip install --upgrade ipython jupyter notebook jupyterlab ipywidgets
       pip install --upgrade openpyxl xlrd
       pip install --upgrade seaborn scikit-learn statsmodels
-      pip install --upgrade fbprophet
+      pip install --upgrade pystan prophet pytz
       pip install --upgrade pydot graphviz
+      pip install --upgrade causalimpact
     SHELL
 
+    # .........................................
+    # Clean
     vgrsimple.vm.provision "80.clean",
-    run: "never",
-    type: "shell",
-    privileged: true,
-    inline: <<-SHELL
-      echo "** Cleaning installation files"
-      apt-get autoclean -y
-      apt-get clean -y
+      type: "shell",
+      run: "never",
+      privileged: true,
+      inline: <<-SHELL
+        echo "*** Removing snaps"
+        for s in lxd core20 snapd
+        do
+            snap remove $s
+        done
 
-      # Cleanup log files
-      echo "** Removing logfiles"
-      find /var/log -type f | while read f; do echo -ne '' > $f; done;
+        echo "*** Cleaning temporal & installation files"
+        apt-get autoclean -y
+        apt-get clean -y
+        apt-get remove -y libx11-dev ibgdk-pixbuf2.0-dev libice-dev libxpm-dev \
+                          libpixman-1-dev libpthread-stubs0-dev libxt-dev \
+                          libxcb-shm0-dev libxcb1-dev libxdmcp-dev libxext-dev \
+                          x11proto-core-dev x11proto-input-dev x11proto-kb-dev \
+                          x11proto-render-dev x11proto-xext-dev xtrans-dev \
+                          krb5-multidev libaec-dev libjbig-dev libtiff5-dev \
+                          libvpx-dev libx11-doc libxau-dev swig3.0 x11proto-dev
 
-      # Remove bash history for root
-      unset HISTFILE
-      rm -f /root/.bash_history
+        # Remove bash history for root
+        unset HISTFILE
+        rm -f /root/.bash_history
 
-      # Remove leftovers for vagrant user
-      HH=/home/vagrant
-      rm -rf $HH/.cache/pip $HH/.bash_history $HH/install/* $HH/Soft
-      rm -rf /opt/ipnb/share/jupyter/nbextensions/.git* $HH/*.log $HH/tmp/*
-      rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
+        # Cleanup log files
+        echo "** Removing logfiles"
+        find /var/log -type f | while read f; do echo -ne '' > $f; done;
+        journalctl --rotate --vacuum-size=10K
 
-      # Remove all temporal files
-      echo "** Cleaning temporal files"
-      rm -rf /tmp/* /var/tmp/*
+        # Remove leftovers for vagrant user
+        HH=/home/vagrant
+        rm -rf $HH/.cache/pip $HH/.gradle $HH/.bash_history $HH/*.log
+        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
+        rm -rf $HH/install/* $HH/Soft $HH/tmp/*
+        rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
-      # Zero free space
-      echo "** Whiteout root & boot partitions"
-      for fs in / /boot/
-      do
-         count=$(df --sync -kP / | tail -n1  | awk -F ' ' '{print $4}')
-         let count--
-         dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
-         rm ${fs}whitespace;
-      done
-      sync
+        # Remove all temporal files
+        echo "*** Cleaning temporal files"
+        rm -rf /tmp/* /var/tmp/*
 
-      # Zero the swap space
-      swappart=$(cat /proc/swaps | tail -n1 | awk -F ' ' '{print $1}')
-      if [ "$swappart" != "" ]; then
-        swapoff $swappart;
-        dd if=/dev/zero of=$swappart;
-        mkswap $swappart;
-        swapon $swappart;
-      fi
+        # Zero the swap space
+        swappart=$(cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}')
+        if [ "$swappart" != "" ]; then
+          echo "*** Whiteout swap space: $swappart"
+          swapoff $swappart;
+          dd if=/dev/zero of=$swappart;
+          mkswap $swappart;
+          swapon $swappart;
+        fi
 
-    SHELL
+        # Zero disk free space
+        echo "*** Whiteout root & boot partitions"
+        for fs in / /boot/
+        do
+           count=$(df --sync -kP $fs | tail -n1 | awk -F ' ' '{print $4}')
+           let count--
+           dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
+           rm -f ${fs}whitespace;
+        done
+        sync
+
+      SHELL
 
   end # config.vm.define
 
