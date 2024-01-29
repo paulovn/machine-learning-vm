@@ -11,10 +11,10 @@ vagrant_command = ARGV[0]
 python_version_full = '3.10'
 
 # --------------------------------------------------------------------------
-# Variables defining the installation of Spark
+# Variables defining the installation of elements
 
 # The version of Spark we will install
-spark_version = '3.3.2'
+spark_version = '3.4.1'
 # [A] Install a locally available custom build
 #spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -27,6 +27,10 @@ spark_basedir = '/opt/spark'
 # A local artifact repository where some custom-built files might be kept
 # Currently not used
 #repo_base = 'http://artifactory.hi.inet/artifactory/vagrant-machinelearning/buildfiles/'
+
+# Virtualenv directory
+venv_basedir = '/opt/ipnb'
+
 
 # --------------------------------------------------------------------------
 # Some variables that affect Vagrant execution
@@ -134,7 +138,7 @@ Vagrant.configure(2) do |config|
      
     # Install some base software
     # (inc. development environments we need to install some Python packages)
-    vmconf.vm.provision "01.base",
+    vmconf.vm.provision "01.update",
     type: "shell",
     privileged: true,
     inline: <<-SHELL
@@ -142,6 +146,12 @@ Vagrant.configure(2) do |config|
      apt-get update -y
      #DEBIAN_FRONTEND=noninteractive apt-get install -y keyboard-configuration
      DEBIAN_FRONTEND=noninteractive apt-get --yes --option Dpkg::Options::="--force-confdef" upgrade
+    SHELL
+
+    vmconf.vm.provision "02.base",
+    type: "shell",
+    privileged: true,
+    inline: <<-SHELL
      # Install some basic packages + dev libraries to compile R/Python pkgs
      apt install build-essential
      apt install gcc g++ freetype-devel libpng-devel libffi-devel
@@ -155,9 +165,9 @@ Vagrant.configure(2) do |config|
      # We don't use this
      systemctl disable ModemManager
     SHELL
-
+    
     # Generate a few locales
-    vmconf.vm.provision "02.locales",
+    vmconf.vm.provision "03.locales",
     type: "shell",
     privileged: true,
     inline: <<-SHELL
@@ -236,24 +246,27 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "15.python.venv",
     type: "shell",
     privileged: false,
-    args: [ python_version_full ],
+    args: [ python_version_full, venv_basedir ],
     inline: <<-SHELL
-     export DEBIAN_FRONTEND=noninteractive
+      VENV=$2
+      PYVER=$1
 
-     sudo apt-get install -y libpython${1}-dev
+      export DEBIAN_FRONTEND=noninteractive
 
-     # Prepare the place
-     sudo rm -rf /opt/ipnb
-     sudo mkdir -m 775 /opt/ipnb
-     sudo chown vagrant.vagrant /opt/ipnb
+      sudo apt-get install -y libpython$PYVER-dev
 
-     # Create a virtualenv
-     python$1 -m venv  /opt/ipnb
+      # Prepare the place
+      sudo rm -rf $VENV
+      sudo mkdir -m 775 $VENV
+      sudo chown vagrant.vagrant $VENV
 
-     # Make links for vagrant user
-     cd $HOME/bin
-     rm -f python python$1 pip
-     ln -s /opt/ipnb/bin/{python,python$1,pip} .
+      # Create a virtualenv
+      python$1 -m venv  $VENV
+
+      # Make links for vagrant user
+      cd $HOME/bin
+      rm -f python python$1 pip
+      ln -s $VENV/bin/{python,python$PYVER,pip} .
     SHELL
 
 
@@ -264,10 +277,14 @@ Vagrant.configure(2) do |config|
     type: "shell",
     keep_color: true,
     privileged: false,
+    args: [ python_version_full, venv_basedir ],
     inline: <<-SHELL
-      sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev gsfonts
+      VENV=$2
+      PYVER=$1
 
-      source /opt/ipnb/bin/activate
+      sudo apt-get install -y libopenblas-dev libhdf5-dev libfreetype6-dev gsfonts libgraphviz-dev
+
+      source $VENV/bin/activate
       pip install --upgrade pip
       pip install --upgrade setuptools
       pip install wheel
@@ -285,7 +302,9 @@ Vagrant.configure(2) do |config|
       pip install --upgrade pyparsing matplotlib
       pip install --upgrade pandas bottleneck numexpr
 
-      pip install --upgrade pydot graphviz
+      pip install --upgrade pydot graphviz pygraphviz
+      pip install --upgrade plotnine
+      # vega, holoviews
 
       pip install --upgrade scikit-learn
       pip install --upgrade imbalanced-learn
@@ -299,13 +318,21 @@ Vagrant.configure(2) do |config|
       pip install --upgrade cloudpickle
       pip install --upgrade dask
 
+      #https://discourse.jupyter.org/t/jupyter-notebook-zmq-message-arrived-on-closed-channel-error/17869/7
+      pip install --upgrade jupyter-client==7.4.4 tornado==6.2
+
+      pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
+      (cd $VENV/lib/python$PYVER/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
       # https://github.com/ipython-contrib/jupyter_contrib_nbextensions/issues/1628
-      pip install --upgrade ipython jupyter-console nbconvert notebook "nbclassic<0.5"
+      #pip install --upgrade ipython jupyter-console nbconvert notebook "nbclassic<0.5"
+
       pip install --upgrade widgetsnbextension ipywidgets ipympl
       pip install --upgrade jupyter_nbextensions_configurator
 
       # We don't need this anymore
-      sudo apt-get remove -y libhdf5-dev libfreetype6-dev
+      sudo apt-get remove -y libhdf5-dev libfreetype-dev libfreetype6-dev \
+           libgraphviz-dev libcurl4-openssl-dev libbrotli-dev libssl-dev \
+           libncurses-dev
 
     SHELL
 
@@ -313,8 +340,9 @@ Vagrant.configure(2) do |config|
     type: "shell",
     keep_color: true,
     privileged: false,
+    args: [ venv_basedir ],
     inline: <<-SHELL
-    VENV=/opt/ipnb
+    VENV=$1
 
     mkdir -p Soft
     cd Soft
@@ -415,7 +443,7 @@ Vagrant.configure(2) do |config|
     # .........................................
     # Install the Spark configuration files for the different modes
 
-    # Move all system config to "orig"
+    # Move all original system config to "orig"
     vmconf.vm.provision "32a.spark.cfg",
     type: "shell",
     privileged: false,
@@ -423,7 +451,7 @@ Vagrant.configure(2) do |config|
     args: [ spark_basedir ],
     inline: <<-SHELL
       cd $1/current/conf
-      mkdir orig
+      mkdir -p orig
       mv *.template orig
     SHELL
 
@@ -443,7 +471,7 @@ Vagrant.configure(2) do |config|
       cd $1/current/conf
       for f in spark-env.sh spark-defaults.conf
       do
-         sed 's|#GFL#||g' ${f}.local > ${f}.local.graphframes
+         sed 's|#GFP#||g' ${f}.local > ${f}.local.graphframes
       done
     SHELL
 
@@ -471,18 +499,18 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "40a.notebook.script",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-mgr",
-    destination: "/opt/ipnb/bin/jupyter-notebook-mgr"
+    destination: venv_basedir + "/bin/jupyter-notebook-mgr"
 
     vmconf.vm.provision "40b.notebook.wrapper",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-wrapper",
-    destination: "/opt/ipnb/bin/jupyter-notebook-wrapper"
+    destination: venv_basedir +"/bin/jupyter-notebook-wrapper"
 
     # Install the Pyspark script wrapper
     vmconf.vm.provision "41.pyspark.wrapper",
     type: "file",
     source: "buildfiles/startup/pyspark-ipnb",
-    destination: "/opt/ipnb/bin/pyspark-ipnb"
+    destination: venv_basedir +"/bin/pyspark-ipnb"
 
     # .........................................
     # Install some files for notebooks
@@ -491,15 +519,17 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "42.notebook.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
-    destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
+    destination: "#{venv_basedir}/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
 
     # install notebook extensions
     vmconf.vm.provision "43a.notebook.ext",
     type: "shell",
     keep_color: true,
     privileged: false, 
+    args: [ venv_basedir ],
     inline: <<-SHELL
-      source /opt/ipnb/bin/activate
+      VENV=$1
+      source $VENV/bin/activate
 
       # Install & enable ipywidgets extension
       jupyter nbextension install --py widgetsnbextension --sys-prefix
@@ -520,15 +550,17 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "43b.notebook.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
-    destination: "/opt/ipnb/share/jupyter/nbextensions"
+    destination: venv_basedir + "/share/jupyter/nbextensions"
 
     # enable desired extensions
     vmconf.vm.provision "43c.notebook.ext",
     type: "shell",
     keep_color: true,
     privileged: false,
+    args: [ venv_basedir ],
     inline: <<-SHELL
-      source /opt/ipnb/bin/activate
+      VENV=$1
+      source $VENV/bin/activate
       for ext in toc2 toggle-headers search-replace python-markdown
       do
         jupyter nbextension enable ${ext}/main --sys-prefix
@@ -540,7 +572,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "44.icon.jupyter",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
-    destination: "/opt/ipnb/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
+    destination: "#{venv_basedir}/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
 
 
     # .........................................
@@ -671,15 +703,16 @@ Vagrant.configure(2) do |config|
         find /var/log -type f | while read f; do echo -ne '' > $f; done;
         journalctl --rotate --vacuum-size=10K
 
-        # Remove all temporal files
-        rm -rf /tmp/* /var/tmp/*
-
-        # Remove leftovers
+        # Remove leftovers for vagrant user
         HH=/home/vagrant
         rm -rf $HH/.cache/pip $HH/.gradle $HH/.bash_history $HH/*.log
         rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
         rm -rf $HH/install/* $HH/Soft $HH/tmp/*
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
+
+        # Remove all temporal files
+        echo "*** Cleaning temporal files"
+        rm -rf /tmp/* /var/tmp/*
 
         # Zero the swap space
         swappart=$(cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}')

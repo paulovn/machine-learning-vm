@@ -1,6 +1,13 @@
+v. 3.4.0
+ * Spark is 3.4.1
+ * Updated some Python packages, notably notebook
+ * Updated sparklyr
+ * Graphframes is 0.8.3 (official, to be downloaded from repository at runtime),
+   0.8.4-SNAPSHOT also available in the VM
+
 v. 3.3.0
  * Base OS updated to Ubuntu 22.04
-   - R is now 4.xx
+   - R is now 4.x
    - Python is 3.10.x
  * Spark is 3.3.2
  * Graphframes 0.8.3-SNAPSHOT assembly jar added to the VM

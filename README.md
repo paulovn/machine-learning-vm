@@ -13,8 +13,8 @@ included inside the virtual machine and what has changed between versions,
 look at the [ChangeLog][cl] file.
 
 The VM is managed through Vagrant. Software requirements for the host are:
- * Vagrant 2.0.1 or above (if possible, use the latest version available)
- * VirtualBox 5.0 or above
+ * Vagrant 2.1 or above (if possible, use the latest version available)
+ * VirtualBox 6.0 or above
 
 ## Process
 
@@ -32,7 +32,7 @@ So the complete creation is a two-step process:
    finalizes the configuration
 
          starting box   --->     base box     --->  final VM
-	    [ubuntu 20.04]        [spark-base64]
+	    [ubuntu 22.04]        [spark-base64]
 
 
 There is an additional submodule, [nbextensions][ex], which contains the
@@ -44,12 +44,7 @@ subproject.)
 ## Missing bits
 
 The [base ``Vagrantfile``][bv] in this project is self-contained (downloads
-everything needed from public repositories) a few exceptions. A notable one
-is Spark: it installs a Spark package that assumes is locally available
-(this is done to be able to install a custom Spark compiled from sources,
-which is done to get a version that uses native math libraries). Alternatively
-it is possible to change that in the Vagrantfile and download and install the
-standard binary distribution.
+everything needed from public repositories), with a few exceptions.
 
  [nb]: https://github.com/paulovn/ml-vm-notebook "Spark notebook VM"
  [ex]: https://github.com/paulovn/nbextensions "Jupyter Notebook extensions"
