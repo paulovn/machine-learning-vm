@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Starts a Spark notebook
+# Manages a Jupyter Notebook service
 #
 # chkconfig: 345 98 02
-# description: Spark notebook process
+# description: Jupyter Notebook service
 #
 ### BEGIN INIT INFO
 # Provides:          jupyter-notebook
@@ -28,7 +28,7 @@ fi
 set -a
 test -f ${CFGNAME} && . ${CFGNAME}
 set +a
-NOTEBOOK_USER=${NOTEBOOK_USER:-spark}
+NOTEBOOK_USER=${NOTEBOOK_USER:-vagrant}
 NOTEBOOK_SCRIPT="${NOTEBOOK_SCRIPT:-/opt/ipnb/bin/jupyter-notebook}"
 NOTEBOOK_BASEDIR="${NOTEBOOK_BASEDIR:-/home/$NOTEBOOK_USER/IPNB}"
 export LOGDIR=${LOGDIR:-/var/log/ipnb}
@@ -103,8 +103,9 @@ start() {
 
 stop() {
     log_success_msg "Stopping $DESC (${DAEMON}): "
-    # start-stop-daemon uses command name, which has a 15-char limit
-    killproc -p $PIDFILE jupyter-notebook
+    # killproc calls start-stop-daemon with --name, which has a 15-char limit
+    #killproc -p $PIDFILE jupyter-notebook
+    /sbin/start-stop-daemon --stop --retry 5 --quiet --pidfile $PIDFILE
     RETVAL=$?
 
     [ $RETVAL -eq $RETVAL_SUCCESS ] && rm -f $LOCKFILE $PIDFILE
