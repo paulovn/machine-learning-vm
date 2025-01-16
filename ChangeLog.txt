@@ -1,3 +1,7 @@
+v. 3.4.1
+ * fixed notebook management script (stop)
+ * updated simple Vagrantfile
+
 v. 3.4.0
  * Spark is 3.4.1
  * Updated some Python packages, notably notebook

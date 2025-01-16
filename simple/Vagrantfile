@@ -16,10 +16,12 @@ vm_cpus = '1'
 
 # --------------------------------------------------------------------------
 # Some variables that affect Vagrant execution
-# Check the command requested -- if ssh we'll change the login user
 
+# Check the command requested -- if ssh we'll change the login user
 vagrant_command = ARGV[0]
 
+# Virtualenv directory
+venv_basedir = '/opt/ipnb'
 
 # --------------------------------------------------------------------------
 # Vagrant configuration
@@ -31,10 +33,10 @@ Vagrant.configure(2) do |config|
   # default one (perhaps because the box will be later packaged)
   config.ssh.insert_key = false
 
-  config.vm.define "vm-ml-nb64" do |vgrsimple|
+  config.vm.define "vm-ml-base64" do |vgrsimple|
 
     # The base box we are using. As fetched from ATLAS
-    vgrsimple.vm.box_version = "= 3.3.0"
+    vgrsimple.vm.box_version = "= 3.4.0"
     vgrsimple.vm.box = "paulovn/spark-base64"
 
     # Alternative place: local box
@@ -46,7 +48,7 @@ Vagrant.configure(2) do |config|
     # vgrsimple.vm.box_check_update = false
 
     # Customize the virtual machine: set hostname & allocated RAM
-    vgrsimple.vm.hostname = "vgr-ipnb-simple"
+    vgrsimple.vm.hostname = "vgr-ml-base64"
     vgrsimple.vm.provider :virtualbox do |vb|
       # Set the hostname in VirtualBox
       vb.name = vgrsimple.vm.hostname.to_s
@@ -64,6 +66,13 @@ Vagrant.configure(2) do |config|
 
     # **********************************************************************
     # Networking
+
+    # ---- NAT interface ----
+    # NAT port forwarding
+    vgrsimple.vm.network :forwarded_port,
+     auto_correct: true,
+     guest: 8888,
+     host: 8008
 
     # ---- bridged interface ----
     # Declare a public network
@@ -129,21 +138,51 @@ Vagrant.configure(2) do |config|
     privileged: false,
     inline: <<-SHELL
       pip install --upgrade pip
-      pip uninstall -y toree xgboost
-
-      pip install --upgrade jupyter-client==7.4.4 tornado==6.2
-      pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
-      (cd /opt/ipnb/lib/python3.*/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
-      pip install --upgrade widgetsnbextension ipywidgets ipympl
+      pip uninstall -y xgboost
 
       pip install --upgrade Cython
-      pip install --upgrade numpy scipy pandas matplotlib ipympl
+
+      # already valid in base 3.4.0
+      #pip install --upgrade jupyter-client==7.4.4 tornado==6.2
+      #pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
+      #(cd /opt/ipnb/lib/python3.*/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
+      #pip install --upgrade widgetsnbextension ipywidgets ipympl
+
+      pip install --upgrade numpy scipy pandas matplotlib pyarrow
       pip install --upgrade openpyxl xlrd
       pip install --upgrade seaborn scikit-learn statsmodels
       pip install --upgrade pystan prophet pytz
       pip install --upgrade pydot graphviz
-      pip install --upgrade causalimpact
+      pip install --upgrade notebook
+
+      #pip install --upgrade causalimpact
     SHELL
+
+    # .........................................
+    # Patched causal impact 0.2.6
+    # See https://github.com/jamalsenouci/causalimpact/pull/50
+    vgrsimple.vm.provision "06.causalimpact.patch",
+    type: "shell",
+    privileged: false,
+    inline: <<-SHELL
+      BR=fix-pd-datetime-check
+      V=0.2.6+p1
+      mkdir soft
+      cd soft
+      wget https://github.com/causalkayak/causalimpact/archive/refs/heads/$BR.zip
+      unzip $BR.zip
+      cd causalimpact-$BR
+      sed "s/name = causalimpact/name = causalimpact\\nversion = $V/" -i setup.cfg
+      python setup.py sdist
+      pip install dist/causalimpact-$V.tar.gz
+    SHELL
+
+    # .........................................
+    # Patched manager script
+    vgrsimple.vm.provision "07.notebook.script",
+    type: "file",
+    source: "buildfiles/jupyter-notebook-mgr",
+    destination: venv_basedir + "/bin/jupyter-notebook-mgr"
 
     # .........................................
     # Clean
