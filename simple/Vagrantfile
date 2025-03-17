@@ -36,7 +36,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "vm-ml-base64" do |vgrsimple|
 
     # The base box we are using. As fetched from ATLAS
-    vgrsimple.vm.box_version = "= 3.4.0"
+    vgrsimple.vm.box_version = "= 3.5.0"
     vgrsimple.vm.box = "paulovn/spark-base64"
 
     # Alternative place: local box
@@ -129,7 +129,6 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: false,
     inline: <<-SHELL
-      pip install future
       rm -f /opt/ipnb/bin/pyspark-ipnb
     SHELL
 
@@ -142,27 +141,26 @@ Vagrant.configure(2) do |config|
 
       pip install --upgrade Cython
 
-      # already valid in base 3.4.0
-      #pip install --upgrade jupyter-client==7.4.4 tornado==6.2
-      #pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
-      #(cd /opt/ipnb/lib/python3.*/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
-      #pip install --upgrade widgetsnbextension ipywidgets ipympl
+      # already valid in base 3.5.0
+      #pip install --upgrade numpy scipy pandas matplotlib pyarrow
+      #pip install --upgrade openpyxl xlrd
+      #pip install --upgrade seaborn scikit-learn statsmodels
+      #pip install --upgrade pystan prophet pytz
+      #pip install --upgrade pydot graphviz
+      #pip install --upgrade notebook
 
-      pip install --upgrade numpy scipy pandas matplotlib pyarrow
-      pip install --upgrade openpyxl xlrd
-      pip install --upgrade seaborn scikit-learn statsmodels
-      pip install --upgrade pystan prophet pytz
-      pip install --upgrade pydot graphviz
-      pip install --upgrade notebook
-
+      # Install causalimpact from master branch
       #pip install --upgrade causalimpact
+      pip install causalimpact@git+https://github.com/jamalsenouci/causalimpact
     SHELL
 
     # .........................................
     # Patched causal impact 0.2.6
+    # [Not needed]
     # See https://github.com/jamalsenouci/causalimpact/pull/50
     vgrsimple.vm.provision "06.causalimpact.patch",
     type: "shell",
+    run: "never",
     privileged: false,
     inline: <<-SHELL
       BR=fix-pd-datetime-check
@@ -176,13 +174,6 @@ Vagrant.configure(2) do |config|
       python setup.py sdist
       pip install dist/causalimpact-$V.tar.gz
     SHELL
-
-    # .........................................
-    # Patched manager script
-    vgrsimple.vm.provision "07.notebook.script",
-    type: "file",
-    source: "buildfiles/jupyter-notebook-mgr",
-    destination: venv_basedir + "/bin/jupyter-notebook-mgr"
 
     # .........................................
     # Clean
@@ -212,15 +203,19 @@ Vagrant.configure(2) do |config|
         unset HISTFILE
         rm -f /root/.bash_history
 
+        # Remove resume information
+        echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
+        apt purge mdadm
+
         # Cleanup log files
-        echo "** Removing logfiles"
+        echo "*** Removing logfiles"
         find /var/log -type f | while read f; do echo -ne '' > $f; done;
         journalctl --rotate --vacuum-size=10K
 
         # Remove leftovers for vagrant user
         HH=/home/vagrant
         rm -rf $HH/.cache/pip $HH/.gradle $HH/.bash_history $HH/*.log
-        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
+        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt $HH/.emacs-d/eln-cache
         rm -rf $HH/install/* $HH/Soft $HH/tmp/*
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
@@ -228,20 +223,33 @@ Vagrant.configure(2) do |config|
         echo "*** Cleaning temporal files"
         rm -rf /tmp/* /var/tmp/*
 
-        # Zero the swap space
-        swappart=$(cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}')
-        if [ "$swappart" != "" ]; then
-          echo "*** Whiteout swap space: $swappart"
-          swapoff $swappart;
-          dd if=/dev/zero of=$swappart;
-          mkswap $swappart;
-          swapon $swappart;
+        # Remove swapfile
+        SWAPFILE=/swap.img
+        if [ -f $SWAPFILE ]
+        then
+               echo "*** Removing swapfile"
+               sed --in-place=.swap "s@^$SWAPFILE@#$SWAPFILE@" /etc/fstab
+               swapoff $SWAPFILE
+               rm $SWAPFILE
         fi
+
+        # Zero swapfiles/swap partitions
+        cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}' | while read SW
+        do
+            echo "*** Whiteout swap space: $SW"
+            swapoff $SW;
+            case $SW in
+              /dev/*) dd if=/dev/zero of=$SW bs=1024;;
+                   *) shred -n 0 -z $SW;;
+            esac
+            mkswap $SW && swapon $SW
+        done
 
         # Zero disk free space
         echo "*** Whiteout root & boot partitions"
         for fs in / /boot/
         do
+           echo "    Partition: $fs"
            count=$(df --sync -kP $fs | tail -n1 | awk -F ' ' '{print $4}')
            let count--
            dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
