@@ -69,7 +69,7 @@ for d in "$VARDIR" "$LOCKDIR"
 do
     [ -d "$d" ] || install -d -m 0755 "$d" 1>/dev/null 2>&1 || :
 done
-test -f $IDFILE || { echo 0 > $IDFILE; chown $NOTEBOOK_USER.$NOTEBOOK_USER $IDFILE; }
+test -f $IDFILE || { echo 0 > $IDFILE; chown $NOTEBOOK_USER:$NOTEBOOK_USER $IDFILE; }
 
 
 # -----------------------------------------------------------------------
@@ -167,17 +167,17 @@ check_for_root() {
 
 set_mode()
 {
+    CONF=/opt/spark/current/conf/
     MODE=$1
     check_for_root
-    test -f "/opt/spark/current/conf/spark-env.sh.$MODE" || { log_failure_msg "Error: config for $MODE missing. Probably needs set-addr"; return 1; }
+    test -f "${CONF}opt/spark-env.sh.$MODE" || { log_failure_msg "Error: config for $MODE missing. Probably needs set-addr"; return 1; }
     #test -f "${CFGNAME}.$MODE" || { log_failure_msg "can't find Spark config ${CFGNAME}.$MODE"; return 1; }
     checkstatusofproc && RUNNING=1
     test "$RUNNING" && { stop || return 1; }
     #echo "$MODE" > ${CFGNAME}
-    (cd /opt/spark/current/conf; \
-	rm -f spark-env.sh spark-defaults.conf; \
-	ln -s spark-env.sh.$MODE spark-env.sh; \
-	ln -s spark-defaults.conf.$MODE spark-defaults.conf) 
+    (cd $CONF; \
+	ln -sf opt/spark-env.sh.$MODE spark-env.sh; \
+	ln -sf opt/spark-defaults.conf.$MODE spark-defaults.conf) 
     log_success_msg "Configured Spark for mode: $MODE "
     test "$RUNNING" && { start; return $?; }
     return 0
@@ -209,7 +209,7 @@ set_addr()
 	    -e "s@{HOSTNAME-NAMENODE}@$NAMENODE_IP@" \
 	    -e "s@{HOSTNAME-SPARK-HS}@$HISTORY_SERVER@" \
 	    -e "s@{DIR-EVENTLOG}@$EVENTLOG_DIR@" \
-	    ${CONF}tpl/$f.$MODE.tpl > ${CONF}$f.$MODE
+	    ${CONF}tpl/$f.$MODE.tpl > ${CONF}opt/$f.$MODE
     done
     # If in YARN mode, update also Hadoop/Yarn config
     if [ "$MODE" = "yarn" ] ;then

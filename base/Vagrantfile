@@ -8,13 +8,13 @@
 vagrant_command = ARGV[0]
 
 # Python version for which we will be creating the notebook environment
-python_version_full = '3.10'
+python_version = '3.12'
 
 # --------------------------------------------------------------------------
 # Variables defining the installation of elements
 
 # The version of Spark we will install
-spark_version = '3.4.1'
+spark_version = '3.5.4'
 # [A] Install a locally available custom build
 #spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -58,16 +58,19 @@ Vagrant.configure(2) do |config|
   # check the correct additions version when booting this machine
   config.vbguest.auto_update = false
 
+  config.vm.boot_timeout = 600
+
   config.vm.define "vm-spark-base64" do |vmconf|
-     
+
+
     # The most common configuration options are documented and commented below.
     # For a complete reference, please see the online documentation at
     # https://docs.vagrantup.com.
 
     # The base box we will be using. 
     # Available at https://atlas.hashicorp.com/search
-    vmconf.vm.box = "bento/ubuntu-22.04"
-    vmconf.vm.box_version = "202212.11.0"
+    vmconf.vm.box = "bento/ubuntu-24.04"
+    vmconf.vm.box_version = "202404.26.0"
     #vmconf.vm.box_url = "file:///almacen/VM/Export/VagrantBox/spark-base64-3.1.2.box"
 
     # Disable automatic box update checking. If you disable this, then
@@ -133,6 +136,7 @@ Vagrant.configure(2) do |config|
     # https://github.com/mitchellh/vagrant/issues/1673
     vmconf.vm.provision "00.fix-tty",
     type: "shell",
+    run: "never",
     privileged: true,
     inline: "sed -i '/tty/!s/mesg n/tty -s \\&\\& mesg n/' /root/.profile"
      
@@ -152,10 +156,13 @@ Vagrant.configure(2) do |config|
     type: "shell",
     privileged: true,
     inline: <<-SHELL
+
      # Install some basic packages + dev libraries to compile R/Python pkgs
-     apt install build-essential
-     apt install gcc g++ freetype-devel libpng-devel libffi-devel
-     apt install libopenblas-dev
+     export DEBIAN_FRONTEND=noninteractive
+     apt-get install -y build-essential
+     apt-get install -y gcc g++ freetype-devel libpng-devel libffi-devel cmake
+     apt-get install -y libopenblas0 libopenblas0-serial libopenblas64-0-serial
+     apt-get install -y libopenblas-dev libopenblas-serial-dev
      # General utility programs
      apt-get install -y emacs-nox python3-venv graphviz
 
@@ -221,7 +228,7 @@ Vagrant.configure(2) do |config|
      #libpq-dev libcurl4-openssl-dev libmariadb-client-lgpl-dev libxml2-dev libcurl4-gnutls-dev libnlopt-dev
     SHELL
 
-    # Install the IR kernel for Jupyter
+    # Install the IR kernel for Jupyter & the sparklyr package
     vmconf.vm.provision "13.IRkernel",
     type: "shell",
     privileged: true,
@@ -234,9 +241,9 @@ Vagrant.configure(2) do |config|
      #Rscript -e 'devtools::install_github( "IRkernel/IRkernel" )'
 
      echo "Installing sparklyr"
-     sudo apt-get install libcurl4-gnutls-dev
+     sudo apt-get install libxml2-dev libcurl4-gnutls-dev
      Rscript -e 'install.packages("sparklyr",dependencies=TRUE,repos=c("http://ftp.cixug.es/CRAN/","http://cran.es.r-project.org/"),quiet=FALSE)'
-     apt-get remove -y libcurl4-gnutls-dev
+     apt-get remove -y libcurl4-gnutls-dev libxml2-dev
      #Rscript -e 'devtools::install_github("rstudio/sparklyr")'
     SHELL
 
@@ -246,7 +253,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "15.python.venv",
     type: "shell",
     privileged: false,
-    args: [ python_version_full, venv_basedir ],
+    args: [ python_version, venv_basedir ],
     inline: <<-SHELL
       VENV=$2
       PYVER=$1
@@ -258,7 +265,7 @@ Vagrant.configure(2) do |config|
       # Prepare the place
       sudo rm -rf $VENV
       sudo mkdir -m 775 $VENV
-      sudo chown vagrant.vagrant $VENV
+      sudo chown vagrant:vagrant $VENV
 
       # Create a virtualenv
       python$1 -m venv  $VENV
@@ -277,7 +284,7 @@ Vagrant.configure(2) do |config|
     type: "shell",
     keep_color: true,
     privileged: false,
-    args: [ python_version_full, venv_basedir ],
+    args: [ python_version, venv_basedir ],
     inline: <<-SHELL
       VENV=$2
       PYVER=$1
@@ -287,7 +294,7 @@ Vagrant.configure(2) do |config|
       source $VENV/bin/activate
       pip install --upgrade pip
       pip install --upgrade setuptools
-      pip install wheel
+      pip install wheel build
 
       # we install with options to avoid InsecurePlatformWarning messages
       pip install 'requests[security]'
@@ -308,12 +315,14 @@ Vagrant.configure(2) do |config|
 
       pip install --upgrade scikit-learn
       pip install --upgrade imbalanced-learn
-      pip install --upgrade xgboost
       pip install --upgrade gensim
       pip install --upgrade networkx
       pip install --upgrade seaborn
       pip install --upgrade statsmodels
       pip install --upgrade pystan prophet pytz
+
+      # this is a big package, and pulls in nvidia-nccl-cu12, also big
+      #pip install --upgrade xgboost
 
       pip install --upgrade cloudpickle
       pip install --upgrade dask
@@ -321,7 +330,7 @@ Vagrant.configure(2) do |config|
       #https://discourse.jupyter.org/t/jupyter-notebook-zmq-message-arrived-on-closed-channel-error/17869/7
       pip install --upgrade jupyter-client==7.4.4 tornado==6.2
 
-      pip install --upgrade ipython jupyter-console nbconvert notebook nbclassic
+      pip install --upgrade ipython jupyter-console 'notebook>=7.1' nbclassic nbconvert
       (cd $VENV/lib/python$PYVER/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
       # https://github.com/ipython-contrib/jupyter_contrib_nbextensions/issues/1628
       #pip install --upgrade ipython jupyter-console nbconvert notebook "nbclassic<0.5"
@@ -336,6 +345,10 @@ Vagrant.configure(2) do |config|
 
     SHELL
 
+    # Build pylucene
+    # Build as a wheel, because latest pip does not like eggs
+    # (https://github.com/pypa/pip/issues/12330)
+    # https://github.com/hscells/pylucene-packaged/blob/main/.github/workflows/package.yml
     vmconf.vm.provision "17.pylucene",
     type: "shell",
     keep_color: true,
@@ -346,7 +359,8 @@ Vagrant.configure(2) do |config|
 
     mkdir -p Soft
     cd Soft
-    PKG=pylucene-9.4.1
+    VERSION=9.12.0
+    PKG=pylucene-$VERSION
     PKGFILE=$PKG-src.tar.gz
     rm -rf $PKG $PKGFILE
     wget --no-verbose http://apache.rediris.es/lucene/pylucene/$PKGFILE || exit 1
@@ -358,21 +372,22 @@ Vagrant.configure(2) do |config|
 
     source $VENV/bin/activate
 
-    # Build JCC
+    # Build & install JCC -- as a wheel, not as an egg
     cd jcc
     export JCC_JDK=$(type -p javac|xargs readlink -f|xargs dirname|xargs dirname)
-    python setup.py install
+    export JCC_ARGSEP=" "
+    export JCC_LFLAGS="-L${JCC_JDK}/lib -ljava -L${JCC_JDK}/lib/server -ljvm -Wl,-rpath=${JCC_JDK}/lib:${JCC_JDK}/lib/server"
+    python setup.py build && pip install . || exit 1
     cd ..
 
-    # build pylucene
+    # build & install pylucene (also as a wheel)
     sudo apt-get install -y ant
-    export PREFIX_PYTHON=$VENV
-    export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
+    export PREFIX_PYTHON="$VENV"
     export PYTHON="${PREFIX_PYTHON}/bin/python3"
-    export "JCC=$PYTHON -m jcc --shared"
-    export NUM_FILES=8
-    make
-    make install
+    export JCC="$PYTHON -m jcc --shared --wheel"
+    export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
+    export NUM_FILES=16
+    make sources && make lucene && make compile && pip install dist/lucene-$VERSION-cp312-cp312-linux_x86_64.whl
 
     SHELL
 
@@ -429,17 +444,26 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Spark add-ons to install
-    #  * GraphFrames snapshot
+    #  * GraphFrames snapshot (if applicable)
     #  * Hadoop Brotli codec
     # (Kafka Structured Streaming can be declared as package in
     # Spark config and it will be automatically downloaded)
     # .........................................
+
     # Install the brotli codec
     vmconf.vm.provision "31.spark.pkg",
     type: "file",
     source: "buildfiles/extra",
     destination: spark_basedir + "/" + spark_name + "/jars/extra"
 
+
+    # Install icons for Pyspark & Scala kernels
+    vmconf.vm.provision "32.kernel.icons",
+    type: "file", 
+    source: 'buildfiles/style/kernel-icons',
+    destination: spark_basedir + '/kernel-icons'
+
+    
     # .........................................
     # Install the Spark configuration files for the different modes
 
@@ -461,7 +485,7 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/conf',
     destination: spark_basedir + '/current/conf'
 
-    # Prepare a configuration for using GraphFrames
+    # Prepare a configuration
     vmconf.vm.provision "32c.spark.cfg",
     type: "shell",
     privileged: false,
@@ -469,39 +493,37 @@ Vagrant.configure(2) do |config|
     args: [ spark_basedir ],
     inline: <<-SHELL
       cd $1/current/conf
+      # Install thge default config
+      ln -s opt/spark-defaults.conf.local spark-defaults.conf
+      ln -s opt/spark-env.sh.local spark-env.sh
+      # Prepare a config for GraphFrames
       for f in spark-env.sh spark-defaults.conf
       do
-         sed 's|#GFP#||g' ${f}.local > ${f}.local.graphframes
+         sed 's|#GFP#||g' opt/${f}.local > opt/${f}.graphframes
       done
     SHELL
-
-    # Install icons for Pyspark & Scala kernels
-    vmconf.vm.provision "33.kernel.icons",
-    type: "file", 
-    source: 'buildfiles/style/kernel-icons',
-    destination: spark_basedir + '/kernel-icons'
 
     # .........................................
 
     # Install the Systemd unit file to manage the notebook server
-    vmconf.vm.provision "36a.notebook.systemd",
+    vmconf.vm.provision "36a.nbk.systemd",
     type: "file",
     source: "buildfiles/startup/notebook.service",
     destination: "/tmp/notebook.service"
 
-    vmconf.vm.provision "36b.notebook.systemd",
+    vmconf.vm.provision "36b.nbk.systemd",
     type: "shell",
     privileged: true,
-    inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root.root $D/$K'
+    inline: 'K=notebook.service; D=/etc/systemd/system; mv /tmp/$K $D; chown root:root $D/$K'
 
     # .........................................
     # Install the IPython Spark notebook daemon script
-    vmconf.vm.provision "40a.notebook.script",
+    vmconf.vm.provision "40a.nbk.script",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-mgr",
     destination: venv_basedir + "/bin/jupyter-notebook-mgr"
 
-    vmconf.vm.provision "40b.notebook.wrapper",
+    vmconf.vm.provision "40b.nbk.wrapper",
     type: "file",
     source: "buildfiles/startup/jupyter-notebook-wrapper",
     destination: venv_basedir +"/bin/jupyter-notebook-wrapper"
@@ -516,13 +538,13 @@ Vagrant.configure(2) do |config|
     # Install some files for notebooks
 
     # a custom css
-    vmconf.vm.provision "42.notebook.css",
+    vmconf.vm.provision "42.nbk.css",
     type: "file",
     source: "buildfiles/style/notebook-custom.css",
-    destination: "#{venv_basedir}/lib/python#{python_version_full}/site-packages/notebook/static/custom/custom.css"
+    destination: "#{venv_basedir}/lib/python#{python_version}/site-packages/notebook/static/custom/custom.css"
 
     # install notebook extensions
-    vmconf.vm.provision "43a.notebook.ext",
+    vmconf.vm.provision "43a.nbk.ext",
     type: "shell",
     keep_color: true,
     privileged: false, 
@@ -532,14 +554,13 @@ Vagrant.configure(2) do |config|
       source $VENV/bin/activate
 
       # Install & enable ipywidgets extension
-      jupyter nbextension install --py widgetsnbextension --sys-prefix
-      jupyter nbextension enable --py widgetsnbextension --sys-prefix
+      jupyter nbclassic-extension install --py widgetsnbextension --sys-prefix
+      jupyter nbclassic-extension enable --py widgetsnbextension --sys-prefix
 
       # Install the extensions configurator and enable it
-      jupyter nbextensions_configurator enable --sys-prefix
-
-      #jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix
-      #jupyter nbextension enable --py jupyter_nbextensions_configurator --sys-prefix
+      #jupyter nbextensions_configurator enable --sys-prefix
+      jupyter nbclassic-extension install --py jupyter_nbextensions_configurator --sys-prefix
+      jupyter nbclassic-extension enable --py jupyter_nbextensions_configurator --sys-prefix
 
       # Install the contrib nbextensions
       #jupyter contrib nbextension install --sys-prefix
@@ -547,13 +568,13 @@ Vagrant.configure(2) do |config|
 
     # add some custom notebook extensions
     # (including a patch for toc2)
-    vmconf.vm.provision "43b.notebook.ext",
+    vmconf.vm.provision "43b.nbk.ext",
     type: 'file',
     source: 'buildfiles/nbextensions',
     destination: venv_basedir + "/share/jupyter/nbextensions"
 
     # enable desired extensions
-    vmconf.vm.provision "43c.notebook.ext",
+    vmconf.vm.provision "43c.nbk.ext",
     type: "shell",
     keep_color: true,
     privileged: false,
@@ -563,7 +584,7 @@ Vagrant.configure(2) do |config|
       source $VENV/bin/activate
       for ext in toc2 toggle-headers search-replace python-markdown
       do
-        jupyter nbextension enable ${ext}/main --sys-prefix
+        jupyter nbclassic-extension enable ${ext}/main --sys-prefix
       done
     SHELL
 
@@ -572,7 +593,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "44.icon.jupyter",
     type: "file",
     source: 'buildfiles/style/jupyter-favicon-custom.ico',
-    destination: "#{venv_basedir}/lib/python#{python_version_full}/site-packages/notebook/static/base/images/favicon-custom.ico"
+    destination: "#{venv_basedir}/lib/python#{python_version}/site-packages/notebook/static/base/images/favicon-custom.ico"
 
 
     # .........................................
@@ -661,7 +682,7 @@ Vagrant.configure(2) do |config|
 
     # .........................................
     # Clean
-    vmconf.vm.provision "80.clean",
+    vmconf.vm.provision "99.clean",
       type: "shell",
       run: "never",
       privileged: true,
@@ -706,7 +727,7 @@ Vagrant.configure(2) do |config|
         # Remove leftovers for vagrant user
         HH=/home/vagrant
         rm -rf $HH/.cache/pip $HH/.gradle $HH/.bash_history $HH/*.log
-        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt
+        rm -rf $HH/.m2 $HH/.ivy2 $HH/.ant $HH/.sbt $HH/.emacs-d/eln-cache
         rm -rf $HH/install/* $HH/Soft $HH/tmp/*
         rm -rf /opt/ipnb/share/jupyter/nbextensions/.git*
 
@@ -714,20 +735,33 @@ Vagrant.configure(2) do |config|
         echo "*** Cleaning temporal files"
         rm -rf /tmp/* /var/tmp/*
 
-        # Zero the swap space
-        swappart=$(cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}')
-        if [ "$swappart" != "" ]; then
-          echo "*** Whiteout swap space: $swappart"
-          swapoff $swappart;
-          dd if=/dev/zero of=$swappart;
-          mkswap $swappart;
-          swapon $swappart;
+        # Remove swapfile
+        SWAPFILE=/swap.img
+        if [ -f $SWAPFILE ]
+        then
+               echo "*** Removing swapfile"
+               sed --in-place=.swap "s@^$SWAPFILE@#$SWAPFILE@" /etc/fstab
+               swapoff $SWAPFILE
+               rm $SWAPFILE
         fi
+
+        # Zero swapfiles/swap partitions
+        cat /proc/swaps | tail -n +2 | awk -F ' ' '{print $1}' | while read SW
+        do
+            echo "*** Whiteout swap space: $SW"
+            swapoff $SW;
+            case $SW in
+              /dev/*) dd if=/dev/zero of=$SW bs=1024;;
+                   *) shred -n 0 -z $SW;;
+            esac
+            mkswap $SW && swapon $SW
+        done
 
         # Zero disk free space
         echo "*** Whiteout root & boot partitions"
         for fs in / /boot/
         do
+           echo "    Partition: $fs"
            count=$(df --sync -kP $fs | tail -n1 | awk -F ' ' '{print $4}')
            let count--
            dd if=/dev/zero of=${fs}whitespace bs=1024 count=$count
