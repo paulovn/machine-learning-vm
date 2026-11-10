@@ -36,7 +36,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "vm-ml-base64" do |vgrsimple|
 
     # The base box we are using. As fetched from ATLAS
-    vgrsimple.vm.box_version = "= 3.5.0"
+    vgrsimple.vm.box_version = "= 3.6.0"
     vgrsimple.vm.box = "paulovn/spark-base64"
 
     # Alternative place: local box
@@ -122,13 +122,14 @@ Vagrant.configure(2) do |config|
     type: "shell", 
     privileged: true,
     inline: <<-SHELL
-      apt-get remove -y openjdk-11-jdk-headless
+      apt-get remove -y openjdk-17-jdk-headless
     SHELL
     
     vgrsimple.vm.provision "04.clean-virtualenv",
     type: "shell", 
     privileged: false,
     inline: <<-SHELL
+      pip uninstall graphframes-py
       rm -f /opt/ipnb/bin/pyspark-ipnb
     SHELL
 
@@ -141,7 +142,7 @@ Vagrant.configure(2) do |config|
 
       pip install --upgrade Cython
 
-      # already valid in base 3.5.0
+      # already valid in base 3.6.0
       #pip install --upgrade numpy scipy pandas matplotlib pyarrow
       #pip install --upgrade openpyxl xlrd
       #pip install --upgrade seaborn scikit-learn statsmodels
@@ -149,35 +150,14 @@ Vagrant.configure(2) do |config|
       #pip install --upgrade pydot graphviz
       #pip install --upgrade notebook
 
-      # Install causalimpact from master branch
-      #pip install --upgrade causalimpact
-      pip install causalimpact@git+https://github.com/jamalsenouci/causalimpact
+      # new
+      pip install --upgrade causalimpactx
     SHELL
 
-    # .........................................
-    # Patched causal impact 0.2.6
-    # [Not needed]
-    # See https://github.com/jamalsenouci/causalimpact/pull/50
-    vgrsimple.vm.provision "06.causalimpact.patch",
-    type: "shell",
-    run: "never",
-    privileged: false,
-    inline: <<-SHELL
-      BR=fix-pd-datetime-check
-      V=0.2.6+p1
-      mkdir soft
-      cd soft
-      wget https://github.com/causalkayak/causalimpact/archive/refs/heads/$BR.zip
-      unzip $BR.zip
-      cd causalimpact-$BR
-      sed "s/name = causalimpact/name = causalimpact\\nversion = $V/" -i setup.cfg
-      python setup.py sdist
-      pip install dist/causalimpact-$V.tar.gz
-    SHELL
 
     # .........................................
     # Clean
-    vgrsimple.vm.provision "80.clean",
+    vgrsimple.vm.provision "99.clean",
       type: "shell",
       run: "never",
       privileged: true,

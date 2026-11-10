@@ -1,8 +1,7 @@
 # -*- mode: ruby;  encoding: iso-8859-1  -*-
 # vi: set ft=ruby :
 # **************************************************************************
-# Create a CentOS 6 virtual machine with all the software needed to
-# run Spark + notebooks
+# Create a virtual machine with all the software needed to run Spark + notebooks
 # **************************************************************************
 
 vagrant_command = ARGV[0]
@@ -14,7 +13,7 @@ python_version = '3.12'
 # Variables defining the installation of elements
 
 # The version of Spark we will install
-spark_version = '3.5.4'
+spark_version = '4.1.1'
 # [A] Install a locally available custom build
 #spark_name = 'spark-' + spark_version + '-bin-custom'
 # [B] Download & install a standard binary distribution
@@ -46,10 +45,11 @@ provision_run_skernel = ''
 # --------------------------------------------------------------------------
 # Vagrant configuration
 
-# The "2" in Vagrant.configure configures the configuration version
+# The "2" in Vagrant.configure sets the configuration version
 Vagrant.configure(2) do |config|
 
-  # This is to help later when packaging: don't change the insecure key
+  # This is to avoid Vagrant inserting a new SSH key, instead of the
+  # default one (perhaps because the box will be later packaged)
   config.ssh.insert_key = false
   #config.ssh.forward_agent = true
   #config.ssh.username = "ubuntu"
@@ -88,7 +88,7 @@ Vagrant.configure(2) do |config|
     # Customize the virtual machine: hostname & RAM
     vmconf.vm.hostname = "vgr-spark-base64"
     vmconf.vm.provider :virtualbox do |vb|
-      # Set the hostname in the provider
+      # Set the hostname in VirtualBox
       vb.name = vmconf.vm.hostname.to_s
       # Customize the amount of memory & CPUs for the VM
       #vb.memory = "1024"
@@ -186,7 +186,7 @@ Vagrant.configure(2) do |config|
     vmconf.vm.provision "10.jdk",
     type: "shell",
     privileged: true, 
-    inline: "apt-get install -y openjdk-11-jdk-headless"
+    inline: "apt-get install -y openjdk-17-jdk-headless"
 
     # Install R
     vmconf.vm.provision "11.R",
@@ -328,15 +328,21 @@ Vagrant.configure(2) do |config|
       pip install --upgrade dask
 
       #https://discourse.jupyter.org/t/jupyter-notebook-zmq-message-arrived-on-closed-channel-error/17869/7
-      pip install --upgrade jupyter-client==7.4.4 tornado==6.2
+      #pip install --upgrade jupyter-client==7.4.4 tornado==6.2
 
-      pip install --upgrade ipython jupyter-console 'notebook>=7.1' nbclassic nbconvert
-      (cd $VENV/lib/python$PYVER/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
+      pip install --upgrade jupyter-client tornado
+
       # https://github.com/ipython-contrib/jupyter_contrib_nbextensions/issues/1628
       #pip install --upgrade ipython jupyter-console nbconvert notebook "nbclassic<0.5"
 
+      pip install --upgrade ipython jupyter-console 'notebook>=7.1' nbclassic nbconvert
+      (cd $VENV/lib/python$PYVER/site-packages/nbclassic/static/components/marked/lib; ln -s marked.umd.js marked.js)
+
       pip install --upgrade widgetsnbextension ipywidgets ipympl
       pip install --upgrade jupyter_nbextensions_configurator
+
+      # Spark GraphFrames Python package
+      pip install --upgrade graphframes-py
 
       # We don't need this anymore
       sudo apt-get remove -y libhdf5-dev libfreetype-dev libfreetype6-dev \
@@ -388,7 +394,7 @@ Vagrant.configure(2) do |config|
     export ANT="JAVA_HOME=$JCC_JDK /usr/bin/ant"
     export NUM_FILES=16
     make sources && make lucene && make compile && pip install dist/lucene-$VERSION-cp312-cp312-linux_x86_64.whl
-
+    sudo apt-get remove -y ant
     SHELL
 
     vmconf.vm.provision "18.cartopy",
@@ -485,7 +491,7 @@ Vagrant.configure(2) do |config|
     source: 'buildfiles/conf',
     destination: spark_basedir + '/current/conf'
 
-    # Prepare a configuration
+    # Finalize a configuration
     vmconf.vm.provision "32c.spark.cfg",
     type: "shell",
     privileged: false,
@@ -493,11 +499,12 @@ Vagrant.configure(2) do |config|
     args: [ spark_basedir ],
     inline: <<-SHELL
       cd $1/current/conf
-      # Install thge default config
+      # Install the default config
+      rm -f spark-defaults.conf spark-env.sh
       ln -s opt/spark-defaults.conf.local spark-defaults.conf
       ln -s opt/spark-env.sh.local spark-env.sh
       # Prepare a config for GraphFrames
-      for f in spark-env.sh spark-defaults.conf
+      for f in spark-defaults.conf
       do
          sed 's|#GFP#||g' opt/${f}.local > opt/${f}.graphframes
       done

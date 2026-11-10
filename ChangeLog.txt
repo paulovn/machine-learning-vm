@@ -1,3 +1,10 @@
+v. 3.6.0
+ * Spark is 4.1.1
+ * Upgraded to Java 17
+ * Graphframes updated to 0.10.0 (in which the Python API is a separate package)
+ * Configuration modified for GraphFrames 0.11.0
+ * Updated Python packages
+
 v. 3.5.0
  * Base OS updated to Ubuntu 24.04
    - R is now 4.4.x
